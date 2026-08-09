@@ -1,0 +1,20 @@
+{
+  "video_id": "26fe0947d7b5",
+  "original_path": "uploads\\bf89513ec6f0417eaa16cc4f5fc1bf4b.mp4",
+  "frames_path": "data\\processed\\26fe0947d7b5\\frames.pt",
+  "audio_path": "data\\processed\\26fe0947d7b5\\audio.pt",
+  "text_path": "data\\processed\\26fe0947d7b5\\text.txt",
+  "labels_path": "data\\processed\\26fe0947d7b5\\labels.json",
+  "emotions": {
+    "joy": 2.8,
+    "sadness": 6.9,
+    "anger": 2.0,
+    "calm": 2.9,
+    "anxiety": 2.6,
+    "expectation": 7.7
+  },
+  "risk_score": 95.0,
+  "category": "情感",
+  "label_source": "mock",
+  "processed_at": "2026-04-02T15:29:30.580331"
+}

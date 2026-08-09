@@ -1,0 +1,13 @@
+{
+  "emotions": {
+    "joy": 2.8,
+    "sadness": 6.9,
+    "anger": 2.0,
+    "calm": 2.9,
+    "anxiety": 2.6,
+    "expectation": 7.7
+  },
+  "risk_score": 95.0,
+  "category": "情感",
+  "source": "mock"
+}

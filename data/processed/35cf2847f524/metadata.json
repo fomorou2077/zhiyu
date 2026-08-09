@@ -1,0 +1,20 @@
+{
+  "video_id": "35cf2847f524",
+  "original_path": "uploads\\7cf1b8420ced498bab175f9e6a806ed8.mp4",
+  "frames_path": "data\\processed\\35cf2847f524\\frames.pt",
+  "audio_path": "data\\processed\\35cf2847f524\\audio.pt",
+  "text_path": "data\\processed\\35cf2847f524\\text.txt",
+  "labels_path": "data\\processed\\35cf2847f524\\labels.json",
+  "emotions": {
+    "joy": 7.7,
+    "sadness": 1.1,
+    "anger": 5.3,
+    "calm": 4.7,
+    "anxiety": 3.7,
+    "expectation": 5.6
+  },
+  "risk_score": 84.1,
+  "category": "娱乐",
+  "label_source": "mock",
+  "processed_at": "2026-05-23T20:34:08.601499"
+}
