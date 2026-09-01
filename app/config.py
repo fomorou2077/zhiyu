@@ -46,6 +46,9 @@ class Settings:
             "MIROFISH_BASE_URL", "http://localhost:5001"
         )
 
+        # ========== Demo模式（开发环境） ==========
+        self.demo_mode: bool = os.getenv("DEMO_MODE", "true").lower() == "true"
+
         # ========== 通用外部服务配置 ==========
         self.request_timeout: int = int(os.getenv("REQUEST_TIMEOUT", "30"))
         self.max_retries: int = int(os.getenv("MAX_RETRIES", "3"))

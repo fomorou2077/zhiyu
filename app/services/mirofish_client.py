@@ -13,13 +13,15 @@ MIROFISH 模拟服务客户端
 
 import time
 import requests
+
+from app.config import settings
 from typing import Any, Dict, Optional, Tuple
 
 # ============================================================
-# 配置（硬编码，不依赖 config.py）
+# 配置（从 app.config.settings 读取，支持 .env 中的 MIROFISH_BASE_URL）
 # ============================================================
 
-MIROFISH_BASE = "http://localhost:5001"
+MIROFISH_BASE = settings.mirofish_base_url
 TIMEOUT = 60          # 模拟可能耗时较长
 MAX_RETRIES = 2
 

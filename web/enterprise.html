@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知舆 · 企业版</title>
+<link rel="stylesheet" href="/web/shared/css/theme.css">
+<link rel="stylesheet" href="/web/shared/css/components.css">
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<style>
+  .app-layout { display: flex; height: 100vh; }
+  .sidebar {
+    width: 240px; min-width: 240px; background: rgba(10, 15, 40, 0.9);
+    border-right: 1px solid var(--card-border); padding: 20px 0;
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; }
+  .sidebar-header h2 { font-size: 20px; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .sidebar-section { padding: 8px 20px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .nav-item {
+    padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; color: var(--text-dim); transition: var(--transition);
+    font-size: 14px; border-left: 2px solid transparent;
+  }
+  .nav-item:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--accent-purple); background: rgba(139,92,246,0.08); border-left-color: var(--accent-purple); }
+  .nav-item i { width: 18px; text-align: center; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-header {
+    padding: 16px 32px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--card-border); background: rgba(10,15,40,0.6);
+  }
+  .main-header h1 { font-size: 20px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .main-content { flex: 1; overflow-y: auto; padding: 24px 32px; }
+
+  /* 统计卡片 */
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 20px; }
+  .stat-card .stat-icon { font-size: 22px; margin-bottom: 10px; }
+  .stat-card .stat-value { font-size: 28px; font-weight: 700; }
+  .stat-card .stat-label { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .stat-card .stat-change { font-size: 12px; margin-top: 6px; }
+  .stat-card .stat-change.up { color: var(--accent-green); }
+  .stat-card .stat-change.down { color: var(--risk-high); }
+
+  /* 布局网格 */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px; }
+
+  /* 卡片头 */
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .card-header h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .card-header h3 i { color: var(--accent-cyan); font-size: 15px; }
+
+  /* 表格 */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { text-align: left; padding: 10px 14px; color: var(--text-muted); font-weight: 500; border-bottom: 1px solid var(--card-border); font-size: 12px; text-transform: uppercase; white-space: nowrap; }
+  .data-table td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text-dim); }
+  .data-table tr:hover td { background: rgba(0,242,255,0.03); color: var(--text-main); }
+
+  /* 状态点 */
+  .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .status-dot.green { background: var(--accent-green); }
+  .status-dot.orange { background: var(--accent-orange); }
+  .status-dot.red { background: var(--risk-high); }
+  .status-dot.cyan { background: var(--accent-cyan); }
+
+  /* 严重度标签 */
+  .severity { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .severity.critical { background: rgba(239,68,68,0.18); color: var(--risk-high); }
+  .severity.high { background: rgba(245,158,11,0.18); color: var(--accent-orange); }
+  .severity.medium { background: rgba(0,242,255,0.12); color: var(--accent-cyan); }
+  .severity.low { background: rgba(16,185,129,0.12); color: var(--accent-green); }
+
+  /* 按钮组 */
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-sm { padding: 6px 14px; font-size: 12px; border-radius: 6px; cursor: pointer; border: 1px solid var(--card-border); background: transparent; color: var(--text-dim); transition: var(--transition); }
+  .btn-sm:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+  .btn-sm.active { background: rgba(0,242,255,0.15); border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+  /* 图表容器 */
+  .chart-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 16px; }
+  .chart-box h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 12px; }
+
+  /* 预警条目 */
+  .alert-item {
+    padding: 14px; border-radius: var(--radius-sm); margin-top: 8px;
+    border-left: 3px solid var(--risk-medium); background: rgba(255,255,255,0.02);
+  }
+  .alert-item.critical { border-left-color: var(--risk-high); background: rgba(239,68,68,0.06); }
+  .alert-item.high { border-left-color: var(--accent-orange); background: rgba(245,158,11,0.04); }
+  .alert-item .alert-title { font-weight: 600; margin-bottom: 4px; }
+  .alert-item .alert-meta { font-size: 12px; color: var(--text-muted); }
+
+  /* 响应卡片 */
+  .response-card { margin-top: 12px; }
+  .response-card textarea { min-height: 200px; font-family: 'SF Mono','Consolas',monospace; font-size: 13px; }
+
+  .auth-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; }
+  .auth-modal.active { display: flex; }
+  .auth-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 32px; width: 400px; }
+
+  /* 搜索弹窗 */
+  .search-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5,8,22,0.95); z-index: 999; padding: 80px 32px 32px; overflow-y: auto; }
+  .search-overlay.show { display: block; }
+  .search-overlay .close-search { position: fixed; top: 24px; right: 32px; font-size: 24px; color: var(--text-dim); cursor: pointer; background: none; border: none; }
+  .search-overlay .close-search:hover { color: var(--text-main); }
+  .search-result-item { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; }
+  .search-result-item:hover { background: rgba(0,242,255,0.04); }
+  .search-result-item .platform-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: rgba(0,242,255,0.1); color: var(--accent-cyan); margin-right: 8px; }
+
+  @media (max-width: 1024px) {
+    .stat-row { grid-template-columns: repeat(2,1fr); }
+    .grid-2, .grid-3, .grid-2-1, .grid-1-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-header"><h2><i class="fa-solid fa-building"></i> 知舆企业版</h2></div>
+    <div class="sidebar-section">监控中心</div>
+    <div class="nav-item active" data-page="dashboard"><i class="fa-solid fa-gauge-high"></i> 监控大盘</div>
+    <div class="nav-item" data-page="alerts"><i class="fa-solid fa-bell"></i> 实时预警</div>
+    <div class="nav-item" data-page="monitor"><i class="fa-solid fa-satellite-dish"></i> 监测管理</div>
+    <div class="nav-item" data-page="spread"><i class="fa-solid fa-diagram-project"></i> 传播追踪</div>
+    <div class="nav-item" data-page="competitor"><i class="fa-solid fa-people-arrows"></i> 竞品监测</div>
+    <div class="sidebar-section">决策中心</div>
+    <div class="nav-item" data-page="plan"><i class="fa-solid fa-clipboard-list"></i> 策划分析</div>
+    <div class="nav-item" data-page="response"><i class="fa-solid fa-robot"></i> 自动回应</div>
+    <div class="nav-item" data-page="reports"><i class="fa-solid fa-file-lines"></i> 报告中心</div>
+    <div class="sidebar-section">管理</div>
+    <div class="nav-item" data-page="brand"><i class="fa-solid fa-building"></i> 品牌管理</div>
+    <div class="nav-item" data-page="audit"><i class="fa-solid fa-clock-rotate-left"></i> 审计日志</div>
+    <div class="nav-item" data-page="settings"><i class="fa-solid fa-gear"></i> 设置</div>
+  </aside>
+
+  <div class="main">
+    <header class="main-header">
+      <h1 id="pageTitle">监控大盘</h1>
+      <div class="search-box" style="flex:1;max-width:400px;margin:0 24px">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="globalSearch" placeholder="搜索舆情、品牌、关键词..." onkeydown="if(event.key==='Enter')mockSearch()">
+      </div>
+      <div class="header-right">
+        <span class="version-badge enterprise" id="versionBadge" onclick="switchToPersonal()" style="cursor:pointer;">企业版</span>
+        <span id="headerUser"></span>
+        <button class="btn-secondary" onclick="logout()" style="padding:6px 12px;font-size:12px">退出</button>
+      </div>
+    </header>
+    <div class="main-content" id="mainContent"></div>
+  </div>
+</div>
+
+<div class="auth-modal" id="authModal">
+  <div class="auth-box"><h3 class="mb-2">登录知舆企业版</h3>
+    <form id="loginForm" onsubmit="doLogin(event)" style="display:flex;flex-direction:column;gap:12px">
+      <input type="text" id="lId" placeholder="邮箱或手机号" required>
+      <input type="password" id="lPw" placeholder="密码" required>
+      <button type="submit" class="btn-primary">登录</button>
+    </form>
+    <p class="text-muted text-center mt-2" style="font-size:12px">Demo: 登录后点击版本切换即可</p>
+    <button class="btn-secondary" onclick="document.getElementById('authModal').classList.remove('active')" style="width:100%;margin-top:8px">取消</button>
+  </div>
+</div>
+
+<script src="/web/shared/js/api-client.js"></script>
+<script src="/web/shared/js/store.js"></script>
+<script src="/web/shared/components/version-switcher.js"></script>
+<script>
+// ========== 模拟企业账户自动登录 ==========
+(function initMockAccount() {
+  // 创建一个假的token（不需要后端验证，前端自给自足）
+  var mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW1vQGVudGVycHJpc2UubG9jYWwiLCJ1c2VyX2lkIjoxLCJ1c2VyX3R5cGUiOiJlbnRlcnByaXNlIn0.mock';
+  var mockUser = {
+    id: 1,
+    username: '企业管理员',
+    email: 'admin@zhiyu-enterprise.com',
+    phone: '138****8888',
+    user_type: 'enterprise',
+    subscription_tier: 'enterprise',
+    subscription_expiry: '2026-09-09',
+    trial_started_at: '2026-08-10',
+    enterprise_brand: '知舆科技'
+  };
+  localStorage.setItem('token', mockToken);
+  localStorage.setItem('user_info', JSON.stringify(mockUser));
+  localStorage.setItem('user_type', 'enterprise');
+})();
+
+ZhiYuStore.init();
+document.getElementById('authModal') && document.getElementById('authModal').remove();
+document.getElementById('headerUser').innerHTML = '<i class="fa-solid fa-circle" style="font-size:6px;color:var(--accent-green);margin-right:4px"></i>企业管理员';
+document.getElementById('versionBadge').textContent = '企业版';
+
+const pageTitles = {
+  dashboard:'监控大盘', alerts:'实时预警', monitor:'监测管理', spread:'传播追踪',
+  competitor:'竞品监测', plan:'策划分析', response:'自动回应', reports:'报告中心',
+  brand:'品牌管理', audit:'审计日志', settings:'设置'
+};
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    item.classList.add('active');
+    navTo(item.dataset.page);
+  });
+});
+
+let charts = {};
+function navTo(pageId) {
+  document.getElementById('pageTitle').textContent = pageTitles[pageId]||pageId;
+  Object.values(charts).forEach(c=>{try{c.dispose()}catch(e){}});
+  charts = {};
+  renderPage(pageId);
+}
+
+function renderPage(pageId) {
+  const mc = document.getElementById('mainContent');
+  mc.innerHTML = '';
+  const pages = {dashboard:renderDashboard, alerts:renderAlerts, monitor:renderMonitor,
+    spread:renderSpread, competitor:renderCompetitor, plan:renderPlan, response:renderResponse,
+    reports:renderReports, brand:renderBrand, audit:renderAudit, settings:renderSettings};
+  if (pages[pageId]) pages[pageId](mc);
+}
+
+// ============================== 监控大盘 ==============================
+const DEMO = {
+  brand: '知舆科技',
+  mentions: 2847, mentionsChange: 12.5, mentionsUp: true,
+  positiveRate: 68.3, positiveChange: 3.2,
+  negativeCount: 187, negativeChange: -8.4, negativeUp: false,
+  hotTopics: ['新品发布','用户体验','行业峰会','AI合作','融资消息','社会责任','技术突破','市场拓展'],
+  trendLabels: ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00'],
+  trendValues: [42,38,55,210,380,295,420,280],
+  sentimentData: [
+    {name:'正面',value:1944,color:'#10b981'},
+    {name:'中立',value:716,color:'#94a3b8'},
+    {name:'负面',value:187,color:'#ef4444'}
+  ],
+  platformData: [
+    {name:'微博',value:980},{name:'抖音',value:720},{name:'小红书',value:480},
+    {name:'知乎',value:350},{name:'B站',value:210},{name:'快手',value:107}
+  ],
+  recentMentions: [
+    {platform:'微博',title:'知舆科技新品发布会定档8月18日，AI舆情监测进入新阶段',time:'10分钟前',sentiment:'positive'},
+    {platform:'抖音',title:'体验了知舆的企业版，监控大盘真的太直观了',time:'25分钟前',sentiment:'positive'},
+    {platform:'知乎',title:'如何看待知舆科技最新一轮融资估值突破50亿？',time:'42分钟前',sentiment:'neutral'},
+    {platform:'小红书',title:'品牌公关必备工具推荐：知舆舆情监测平台',time:'1小时前',sentiment:'positive'},
+    {platform:'微博',title:'知舆平台出现短暂服务中断，官方回应正在修复',time:'2小时前',sentiment:'negative'},
+    {platform:'B站',title:'深度测评知舆企业版vs竞品，功能全面对比',time:'3小时前',sentiment:'neutral'},
+    {platform:'快手',title:'知舆AI自动回应功能帮我们节省了80%的公关响应时间',time:'4小时前',sentiment:'positive'},
+    {platform:'微博',title:'知舆CEO接受专访：AI将重塑品牌舆情管理行业',time:'5小时前',sentiment:'positive'}
+  ]
+};
+
+function renderDashboard(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-message"></i></div><div class="stat-value">2,847</div><div class="stat-label">品牌总声量</div><div class="stat-change up"><i class="fa-solid fa-arrow-up"></i> 12.5% 环比</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-thumbs-up"></i></div><div class="stat-value">68.3%</div><div class="stat-label">正面情感占比</div><div class="stat-change up"><i class="fa-solid fa-arrow-up"></i> 3.2% 环比</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--risk-high)"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="stat-value">187</div><div class="stat-label">负面预警数</div><div class="stat-change down"><i class="fa-solid fa-arrow-down"></i> 8.4% 环比</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-globe"></i></div><div class="stat-value">6</div><div class="stat-label">监测平台数</div><div class="stat-change" style="color:var(--text-muted)">全覆盖运行中</div></div>'
+    + '</div>'
+    + '<div class="grid-2">'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-chart-line"></i> 舆情热度趋势 (24h)</h3><div id="chartHeat" style="height:280px"></div></div>'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-chart-pie"></i> 情感分布</h3><div id="chartSentiment" style="height:280px"></div></div>'
+    + '</div>'
+    + '<div class="grid-3">'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-fire"></i> 平台声量分布</h3><div id="chartPlatform" style="height:240px"></div></div>'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-list"></i> 最新提及</h3><div id="recentMentions"></div></div>'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-tags"></i> 热点关键词</h3><div id="hotTopics"></div></div>'
+    + '</div></div>';
+  setTimeout(initDashboardCharts, 80);
+}
+
+function initDashboardCharts() {
+  var hc = echarts.init(document.getElementById('chartHeat'));
+  hc.setOption({
+    tooltip:{trigger:'axis'}, grid:{left:45,right:20,top:10,bottom:25},
+    xAxis:{type:'category',data:DEMO.trendLabels,axisLabel:{color:'#94a3b8',fontSize:10}},
+    yAxis:{type:'value',axisLabel:{color:'#94a3b8'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.06)'}}},
+    series:[{data:DEMO.trendValues,type:'line',smooth:true,symbol:'circle',symbolSize:6,
+      lineStyle:{color:'#8b5cf6',width:2},itemStyle:{color:'#8b5cf6'},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(139,92,246,0.3)'},{offset:1,color:'rgba(139,92,246,0.02)'}])}}]
+  }); charts.heat = hc;
+
+  var sc = echarts.init(document.getElementById('chartSentiment'));
+  sc.setOption({
+    tooltip:{trigger:'item',formatter:'{b}: {c} 条 ({d}%)'},
+    legend:{bottom:0,textStyle:{color:'#94a3b8',fontSize:11}},
+    series:[{type:'pie',radius:['45%','72%'],center:['50%','45%'],avoidLabelOverlap:false,
+      itemStyle:{borderColor:'rgba(10,15,40,0.8)',borderWidth:3},
+      label:{show:true,formatter:'{b}\n{d}%',color:'#94a3b8',fontSize:11},
+      data:DEMO.sentimentData.map(function(d){return {value:d.value,name:d.name,itemStyle:{color:d.color}}})}]
+  }); charts.sentiment = sc;
+
+  var pc = echarts.init(document.getElementById('chartPlatform'));
+  pc.setOption({
+    tooltip:{trigger:'axis'}, grid:{left:60,right:20,top:10,bottom:20},
+    xAxis:{type:'value',axisLabel:{color:'#94a3b8'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.06)'}}},
+    yAxis:{type:'category',data:DEMO.platformData.map(function(d){return d.name}).reverse(),axisLabel:{color:'#94a3b8',fontSize:11},inverse:false},
+    series:[{data:DEMO.platformData.map(function(d){return d.value}).reverse(),type:'bar',
+      barMaxWidth:18,label:{show:true,position:'right',color:'#94a3b8',fontSize:10},
+      itemStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:'#00f2ff'},{offset:1,color:'#8b5cf6'}])}}]
+  }); charts.platform = pc;
+
+  document.getElementById('recentMentions').innerHTML = DEMO.recentMentions.slice(0,6).map(function(m){
+    var cls = m.sentiment==='negative'?'high':(m.sentiment==='positive'?'':'');
+    var icon = m.sentiment==='positive'?'trending-up':(m.sentiment==='negative'?'trending-down':'minus');
+    return '<div class="alert-item'+(cls?' '+cls:'')+'"><div class="alert-title"><i class="fa-solid fa-'+icon+'" style="font-size:11px;margin-right:4px;color:'+(m.sentiment==='negative'?'var(--risk-high)':m.sentiment==='positive'?'var(--accent-green)':'var(--text-muted)')+'"></i>'+m.title+'</div><div class="alert-meta"><span class="tag" style="margin-right:6px">'+m.platform+'</span>'+m.time+'</div></div>';
+  }).join('');
+
+  document.getElementById('hotTopics').innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">'
+    + DEMO.hotTopics.map(function(t,i){
+        var colors = ['#00f2ff','#8b5cf6','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#14b8a6'];
+        return '<span class="tag" style="font-size:'+(16-(i*0.8))+'px;padding:6px 14px;color:'+colors[i]+';background:'+colors[i]+'22;border:1px solid '+colors[i]+'44">'+t+'</span>';
+      }).join('')+'</div>';
+}
+
+// ============================== 实时预警 ==============================
+var alertRules = [
+  {id:1,name:'负面投诉激增',keywords:['投诉','退款','差评'],threshold:30,platforms:['微博','小红书','黑猫投诉'],enabled:true},
+  {id:2,name:'品牌声誉风险',keywords:['造假','欺诈','曝光'],threshold:15,platforms:['微博','知乎','抖音'],enabled:true},
+  {id:3,name:'竞品恶意攻击',keywords:['水军','黑稿','恶意'],threshold:20,platforms:['微博','豆瓣'],enabled:false}
+];
+var alertHistory = [
+  {id:1,title:'负面情绪突增：\"投诉\"关键词占比达42%',trigger:'投诉/退款',severity:'critical',platform:'微博',time:'8分钟前',affected:15600,trend:'spike'},
+  {id:2,title:'品牌讨论量异常飙升320%',trigger:'品牌名',severity:'high',platform:'抖音',time:'23分钟前',affected:8900,trend:'rising'},
+  {id:3,title:'竞品对比帖中出现大量负面评论',trigger:'竞品对比',severity:'medium',platform:'小红书',time:'1小时前',affected:3200,trend:'steady'},
+  {id:4,title:'旧闻被重新翻炒，疑似有组织传播',trigger:'历史事件',severity:'high',platform:'知乎',time:'2小时前',affected:12400,trend:'rising'},
+  {id:5,title:'用户反馈产品体验问题集中出现',trigger:'产品体验',severity:'low',platform:'B站',time:'3小时前',affected:1800,trend:'steady'},
+  {id:6,title:'竞品发布会对标我方产品，引发讨论',trigger:'竞品发布会',severity:'medium',platform:'微博',time:'4小时前',affected:5600,trend:'falling'}
+];
+
+function renderAlerts(mc) {
+  var rulesHTML = alertRules.map(function(r){
+    var enabledIcon = r.enabled ? '<i class="fa-solid fa-circle-check" style="color:var(--accent-green)"></i>' : '<i class="fa-solid fa-circle-pause" style="color:var(--text-muted)"></i>';
+    return '<div class="alert-item"><div style="display:flex;justify-content:space-between;align-items:center">'
+      + '<div><strong>'+enabledIcon+' '+r.name+'</strong>'
+      + '<div style="margin-top:4px">'+r.keywords.map(function(k){return '<span class="tag">'+k+'</span>';}).join(' ')+'</div>'
+      + '<div class="alert-meta" style="margin-top:4px">阈值: '+r.threshold+'% | 平台: '+r.platforms.join('/')+'</div></div>'
+      + '<div class="btn-group"><button class="btn-sm" onclick="toggleAlertRule('+r.id+')">'+(r.enabled?'暂停':'启用')+'</button><button class="btn-sm" style="color:var(--risk-high)" onclick="deleteAlertRule('+r.id+')">删除</button></div>'
+      + '</div></div>';
+  }).join('');
+
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--risk-high)"><i class="fa-solid fa-circle-exclamation"></i></div><div class="stat-value">2</div><div class="stat-label">危急预警</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="stat-value">2</div><div class="stat-label">高风险预警</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-bell"></i></div><div class="stat-value">3</div><div class="stat-label">活跃预警规则</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-clock"></i></div><div class="stat-value">24h</div><div class="stat-label">预警监控覆盖</div></div>'
+    + '</div>'
+    + '<div class="grid-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-sliders"></i> 预警规则配置</h3><button class="btn-primary btn-sm" onclick="addAlertRuleUI()"><i class="fa-solid fa-plus"></i> 新建规则</button></div>'
+    + '<div id="alertRulesList">'+rulesHTML+'</div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-clock-rotate-left"></i> 最新预警事件</h3><div class="btn-group"><button class="btn-sm active">全部</button><button class="btn-sm">危急</button><button class="btn-sm">高</button><button class="btn-sm">中</button></div></div>'
+    + '<div>'+alertHistory.map(function(a){
+      var sevClass = a.severity==='critical'?'critical':(a.severity==='high'?'high':(a.severity==='medium'?'medium':'low'));
+      var sevLabel = a.severity==='critical'?'危急':(a.severity==='high'?'高风险':(a.severity==='medium'?'中风险':'低风险'));
+      var trendIcon = a.trend==='spike'?'fa-arrow-up':(a.trend==='rising'?'fa-arrow-trend-up':(a.trend==='falling'?'fa-arrow-trend-down':'fa-minus'));
+      return '<div class="alert-item '+sevClass+'"><div style="display:flex;justify-content:space-between;align-items:flex-start">'
+        + '<div><div class="alert-title"><span class="severity '+sevClass+'">'+sevLabel+'</span> '+a.title+'</div>'
+        + '<div class="alert-meta" style="margin-top:4px"><i class="fa-solid '+trendIcon+'" style="margin-right:4px"></i>触发词: '+a.trigger+' | 预计影响: '+a.affected.toLocaleString()+'人</div></div>'
+        + '<div style="text-align:right"><span class="tag" style="margin-right:6px">'+a.platform+'</span><div class="alert-meta">'+a.time+'</div></div>'
+        + '</div></div>';
+    }).join('')+'</div></div></div>'
+    + '<div id="alertRuleForm" style="display:none"></div></div>';
+}
+
+function addAlertRuleUI() {
+  var el = document.getElementById('alertRuleForm');
+  el.style.display = 'block';
+  el.innerHTML = '<div class="glass-card mt-2"><div class="card-header"><h3><i class="fa-solid fa-plus"></i> 新建预警规则</h3></div>'
+    + '<div class="input-row mb-2"><input type="text" id="newRuleName" placeholder="规则名称"></div>'
+    + '<div class="input-row mb-2"><input type="text" id="newRuleKw" placeholder="关键词（逗号分隔）"><input type="number" id="newRuleTh" placeholder="负面阈值%" value="30" style="width:120px"></div>'
+    + '<div class="btn-group"><button class="btn-primary btn-sm" onclick="saveAlertRule()">保存规则</button><button class="btn-sm" onclick="document.getElementById(\'alertRuleForm\').style.display=\'none\'">取消</button></div></div>';
+}
+
+function saveAlertRule() {
+  var name = document.getElementById('newRuleName').value.trim();
+  var kw = document.getElementById('newRuleKw').value.trim();
+  var th = parseInt(document.getElementById('newRuleTh').value)||30;
+  if (!name||!kw) return alert('请填写规则名称和关键词');
+  alertRules.push({id:Date.now(),name:name,keywords:kw.split(',').map(function(k){return k.trim()}),threshold:th,platforms:['微博','抖音','小红书'],enabled:true});
+  document.getElementById('alertRuleForm').style.display = 'none';
+  renderAlerts(document.getElementById('mainContent'));
+  showToast('预警规则已保存','success');
+}
+
+function toggleAlertRule(id) {
+  var r = alertRules.find(function(a){return a.id===id;});
+  if (r) { r.enabled = !r.enabled; renderAlerts(document.getElementById('mainContent')); }
+}
+
+function deleteAlertRule(id) {
+  alertRules = alertRules.filter(function(a){return a.id!==id;});
+  renderAlerts(document.getElementById('mainContent'));
+  showToast('规则已删除','info');
+}
+
+// ============================== 监测管理 ==============================
+var monitorKeywords = ['知舆科技','舆情监测','AI公关','品牌管理','危机公关','竞品分析','新媒体营销','用户投诉'];
+var monitorSnapshots = [
+  {time:'2026-08-10 10:00',keyword:'知舆科技',mentions:342,sentiment:'positive',hotPost:'新品发布会引爆讨论'},
+  {time:'2026-08-10 09:00',keyword:'AI公关',mentions:178,sentiment:'positive',hotPost:'AI如何改变公关行业'},
+  {time:'2026-08-10 08:00',keyword:'品牌管理',mentions:256,sentiment:'neutral',hotPost:'品牌舆情管理最佳实践'},
+  {time:'2026-08-09 23:00',keyword:'危机公关',mentions:89,sentiment:'negative',hotPost:'某品牌危机公关翻车复盘'},
+  {time:'2026-08-09 18:00',keyword:'舆情监测',mentions:412,sentiment:'positive',hotPost:'企业舆情监测工具横评'}
+];
+
+function renderMonitor(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-magnifying-glass"></i></div><div class="stat-value">'+monitorKeywords.length+'</div><div class="stat-label">监测关键词</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-globe"></i></div><div class="stat-value">6</div><div class="stat-label">覆盖平台</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-database"></i></div><div class="stat-value">5</div><div class="stat-label">今日快照</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-clock"></i></div><div class="stat-value">1h</div><div class="stat-label">采集间隔</div></div>'
+    + '</div>'
+    + '<div class="grid-1-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-key"></i> 关键词管理</h3></div>'
+    + '<div class="input-row mb-2"><input type="text" id="newKeyword" placeholder="输入关键词后回车添加..."><button class="btn-primary btn-sm" onclick="addMonitorKeyword()"><i class="fa-solid fa-plus"></i></button><button class="btn-sm" onclick="smartExpandKeyword()"><i class="fa-solid fa-wand-magic-sparkles"></i> AI扩展</button></div>'
+    + '<div id="keywordTags" class="mt-2"></div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-camera"></i> 最近监测快照</h3></div>'
+    + '<table class="data-table"><thead><tr><th>时间</th><th>关键词</th><th>声量</th><th>情感</th><th>热帖</th></tr></thead><tbody id="snapshotBody"></tbody></table></div>'
+    + '</div>'
+    + '<div class="glass-card mt-2"><div class="card-header"><h3><i class="fa-solid fa-window-maximize"></i> 监测平台</h3></div>'
+    + '<div class="btn-group">'+['微博','抖音','小红书','知乎','B站','快手'].map(function(p,i){return '<label class="btn-sm active" style="cursor:pointer"><input type="checkbox" checked style="margin-right:4px"> '+p+'</label>';}).join('')+'</div></div>'
+    + '</div>';
+  renderKeywordTags();
+  renderSnapshots();
+}
+
+function renderKeywordTags() {
+  var el = document.getElementById('keywordTags');
+  if (!el) return;
+  el.innerHTML = monitorKeywords.map(function(k){return '<span class="tag" style="font-size:13px;padding:6px 14px;margin:4px;cursor:pointer">'+k+' <i class="fa-solid fa-xmark" style="cursor:pointer;margin-left:4px;opacity:0.6" onclick="event.stopPropagation();removeMonitorKeyword(\''+k+'\')"></i></span>';}).join('') || '<span class="text-dim">暂无监测关键词</span>';
+}
+
+function renderSnapshots() {
+  var el = document.getElementById('snapshotBody');
+  if (!el) return;
+  el.innerHTML = monitorSnapshots.map(function(s){
+    var sc = s.sentiment==='positive'?'green':(s.sentiment==='negative'?'red':'cyan');
+    return '<tr><td>'+s.time+'</td><td><span class="tag">'+s.keyword+'</span></td><td><strong>'+s.mentions+'</strong></td><td><span class="status-dot '+sc+'"></span>'+s.sentiment+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+s.hotPost+'</td></tr>';
+  }).join('');
+}
+
+function addMonitorKeyword() {
+  var input = document.getElementById('newKeyword');
+  var kw = input.value.trim();
+  if (!kw||monitorKeywords.includes(kw)) return;
+  monitorKeywords.push(kw);
+  input.value = '';
+  renderKeywordTags();
+  showToast('关键词已添加','success');
+}
+
+function removeMonitorKeyword(kw) {
+  monitorKeywords = monitorKeywords.filter(function(k){return k!==kw;});
+  renderKeywordTags();
+}
+
+function smartExpandKeyword() {
+  var expansions = ['品牌形象','口碑管理','竞品动态','行业趋势','政策法规','社会责任','员工舆情'];
+  var added = [];
+  expansions.forEach(function(k){if(!monitorKeywords.includes(k)){monitorKeywords.push(k);added.push(k);}});
+  renderKeywordTags();
+  showToast('AI已扩展 '+added.length+' 个关键词: '+added.join('/'),'success');
+}
+
+// ============================== 传播追踪 ==============================
+function renderSpread(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-share-nodes"></i></div><div class="stat-value">7</div><div class="stat-label">关键传播节点</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-people-arrows"></i></div><div class="stat-value">24.6万</div><div class="stat-label">预估触达人次</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-arrow-right-arrow-left"></i></div><div class="stat-value">6</div><div class="stat-label">跨平台跳转路径</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--risk-high)"><i class="fa-solid fa-user-large"></i></div><div class="stat-value">3</div><div class="stat-label">关键KOL节点</div></div>'
+    + '</div>'
+    + '<div class="grid-2-1">'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-diagram-project"></i> 传播网络图</h3><div id="chartSpread" style="height:420px"></div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-list-ol"></i> 关键节点</h3></div><div id="spreadNodes"></div></div>'
+    + '</div></div>';
+
+  setTimeout(function(){
+    var spreadNodes = [
+      {name:'源发微博',symbolSize:50,itemStyle:{color:'#ef4444'},category:0},
+      {name:'科技大V A',symbolSize:35,itemStyle:{color:'#f59e0b'},category:1},
+      {name:'行业媒体B',symbolSize:30,itemStyle:{color:'#f59e0b'},category:1},
+      {name:'知乎热帖',symbolSize:32,itemStyle:{color:'#8b5cf6'},category:2},
+      {name:'抖音视频C',symbolSize:28,itemStyle:{color:'#8b5cf6'},category:2},
+      {name:'小红书笔记',symbolSize:24,itemStyle:{color:'#00f2ff'},category:3},
+      {name:'B站二创',symbolSize:22,itemStyle:{color:'#00f2ff'},category:3}
+    ];
+    var spreadLinks = [
+      {source:'源发微博',target:'科技大V A'},{source:'源发微博',target:'行业媒体B'},
+      {source:'科技大V A',target:'知乎热帖'},{source:'行业媒体B',target:'抖音视频C'},
+      {source:'知乎热帖',target:'小红书笔记'},{source:'抖音视频C',target:'B站二创'},
+      {source:'科技大V A',target:'抖音视频C'},{source:'知乎热帖',target:'B站二创'}
+    ];
+    var sc = echarts.init(document.getElementById('chartSpread'));
+    sc.setOption({
+      tooltip:{formatter:'{b}'},
+      legend:{bottom:0,textStyle:{color:'#94a3b8'},data:['源头','KOL','平台发酵','二创扩散']},
+      series:[{type:'graph',layout:'force',roam:true,force:{repulsion:300,edgeLength:[120,240]},
+        label:{show:true,color:'#94a3b8',fontSize:11},lineStyle:{color:'rgba(255,255,255,0.2)',curveness:0.15},
+        categories:[{name:'源头',itemStyle:{color:'#ef4444'}},{name:'KOL',itemStyle:{color:'#f59e0b'}},{name:'平台发酵',itemStyle:{color:'#8b5cf6'}},{name:'二创扩散',itemStyle:{color:'#00f2ff'}}],
+        data:spreadNodes,links:spreadLinks}]
+    }); charts.spread = sc;
+
+    var nodesData = [
+      {name:'源发微博',influence:'极高',reach:'12.8万',type:'源头',speed:'N/A'},
+      {name:'科技大V A',influence:'高',reach:'6.2万',type:'KOL转发',speed:'+340%/h'},
+      {name:'行业媒体B',influence:'高',reach:'3.8万',type:'媒体转发',speed:'+220%/h'},
+      {name:'知乎热帖',influence:'中',reach:'4.5万',type:'平台扩散',speed:'+180%/h'},
+      {name:'抖音视频C',influence:'中',reach:'2.1万',type:'短视频扩散',speed:'+150%/h'},
+      {name:'小红书笔记',influence:'低',reach:'0.8万',type:'UGC扩散',speed:'+90%/h'},
+      {name:'B站二创',influence:'低',reach:'0.5万',type:'二创传播',speed:'+60%/h'}
+    ];
+    document.getElementById('spreadNodes').innerHTML = nodesData.map(function(n){
+      var infColor = n.influence==='极高'?'var(--risk-high)':(n.influence==='高'?'var(--accent-orange)':(n.influence==='中'?'var(--accent-cyan)':'var(--text-dim)'));
+      return '<div class="alert-item"><div style="display:flex;justify-content:space-between"><div><strong>'+n.name+'</strong><span class="tag" style="margin-left:8px">'+n.type+'</span></div><span style="color:'+infColor+';font-weight:600">'+n.influence+'</span></div><div class="alert-meta" style="margin-top:4px">触达: '+n.reach+' | 扩散速度: '+n.speed+'</div></div>';
+    }).join('');
+  }, 80);
+}
+
+// ============================== 竞品监测 ==============================
+var competitorData = [
+  {name:'竞品Alpha',mentions:2150,positive:62,sentiment:62,trend:'up',change:8.3,keywords:['新品','融资','合作'],highlight:'新品发布引发广泛关注'},
+  {name:'竞品Beta',mentions:1890,positive:55,sentiment:55,trend:'steady',change:1.2,keywords:['裁员','亏损','高管变动'],highlight:'Q2财报不及预期'},
+  {name:'竞品Gamma',mentions:1560,positive:71,sentiment:71,trend:'down',change:-5.7,keywords:['用户增长','出海','AI'],highlight:'海外市场拓展加速'},
+  {name:'知舆科技(我方)',mentions:2847,positive:68,sentiment:68,trend:'up',change:12.5,keywords:['AI舆情','企业版','融资'],highlight:'企业版上线获好评'}
+];
+
+function renderCompetitor(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'+competitorData.map(function(c,i){
+      var isUs = i===3;
+      var icon = isUs ? 'fa-star' : 'fa-building';
+      var iconColor = isUs ? 'var(--accent-purple)' : 'var(--text-muted)';
+      var trendIcon = c.trend==='up'?'fa-arrow-up':(c.trend==='down'?'fa-arrow-down':'fa-minus');
+      var trendColor = c.trend==='up'?'var(--accent-green)':(c.trend==='down'?'var(--risk-high)':'var(--text-muted)');
+      var borderStyle = isUs ? 'border:1px solid rgba(139,92,246,0.4);background:rgba(139,92,246,0.06)' : '';
+      return '<div class="stat-card" style="'+borderStyle+'"><div class="stat-icon" style="color:'+iconColor+'"><i class="fa-solid '+icon+'"></i></div><div class="stat-value" style="font-size:22px">'+c.mentions.toLocaleString()+'</div><div class="stat-label">'+c.name+'</div><div class="stat-change" style="color:'+trendColor+'"><i class="fa-solid '+trendIcon+'"></i> '+Math.abs(c.change)+'% 环比</div><div style="margin-top:8px"><span style="color:var(--accent-green)">正面率: '+c.sentiment+'%</span></div></div>';
+    }).join('')+'</div>'
+    + '<div class="grid-2">'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-chart-bar"></i> 品牌声量对比</h3><div id="chartCompBar" style="height:300px"></div></div>'
+    + '<div class="chart-box"><h3><i class="fa-solid fa-chart-radar"></i> 多维对比雷达</h3><div id="chartCompRadar" style="height:300px"></div></div>'
+    + '</div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-table"></i> 竞品详细对比</h3></div>'
+    + '<table class="data-table"><thead><tr><th>品牌</th><th>声量(24h)</th><th>正面率</th><th>趋势</th><th>核心关键词</th><th>亮点/风险</th></tr></thead><tbody>'
+    + competitorData.map(function(c){
+      var trendLabel = c.trend==='up'?'<span style="color:var(--accent-green)"><i class="fa-solid fa-arrow-up"></i> 上升</span>':(c.trend==='down'?'<span style="color:var(--risk-high)"><i class="fa-solid fa-arrow-down"></i> 下降</span>':'<span style="color:var(--text-muted)"><i class="fa-solid fa-minus"></i> 持平</span>');
+      return '<tr><td><strong>'+c.name+'</strong></td><td>'+c.mentions.toLocaleString()+'</td><td>'+c.sentiment+'%</td><td>'+trendLabel+'</td><td>'+c.keywords.map(function(k){return '<span class="tag">'+k+'</span>';}).join(' ')+'</td><td>'+c.highlight+'</td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+
+  setTimeout(function(){
+    var bar = echarts.init(document.getElementById('chartCompBar'));
+    bar.setOption({
+      tooltip:{trigger:'axis'}, grid:{left:70,right:30,top:10,bottom:25},
+      legend:{data:['声量','正面率%'],bottom:0,textStyle:{color:'#94a3b8'}},
+      xAxis:{type:'category',data:competitorData.map(function(c){return c.name;}),axisLabel:{color:'#94a3b8',fontSize:10}},
+      yAxis:[
+        {type:'value',name:'声量',axisLabel:{color:'#94a3b8'},splitLine:{lineStyle:{color:'rgba(255,255,255,0.06)'}}},
+        {type:'value',name:'%',axisLabel:{color:'#94a3b8'},splitLine:{show:false}}
+      ],
+      series:[
+        {name:'声量',type:'bar',data:competitorData.map(function(c){return c.mentions;}),barMaxWidth:36,
+          itemStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#8b5cf6'},{offset:1,color:'#3b82f6'}])}},
+        {name:'正面率%',type:'line',yAxisIndex:1,data:competitorData.map(function(c){return c.sentiment;}),smooth:true,symbol:'circle',symbolSize:8,
+          lineStyle:{color:'#10b981',width:2},itemStyle:{color:'#10b981'}}
+      ]
+    }); charts.compBar = bar;
+
+    var radar = echarts.init(document.getElementById('chartCompRadar'));
+    var radarIndicators = [
+      {name:'声量规模',max:3000},{name:'正面率',max:100},{name:'增长率',max:20},
+      {name:'媒体覆盖',max:100},{name:'用户互动',max:100}
+    ];
+    var radarColors = ['#8b5cf6','#f59e0b','#00f2ff','#10b981'];
+    radar.setOption({
+      tooltip:{}, legend:{bottom:0,textStyle:{color:'#94a3b8',fontSize:10}},
+      radar:{center:['50%','45%'],radius:'65%',indicator:radarIndicators,axisName:{color:'#94a3b8',fontSize:10}},
+      series:[{type:'radar',data:competitorData.map(function(c,i){return {value:[c.mentions,c.sentiment,Math.abs(c.change)*5,70+Math.random()*30,60+Math.random()*40],name:c.name,areaStyle:{color:radarColors[i],opacity:0.12}};})}]
+    }); charts.compRadar = radar;
+  }, 80);
+}
+
+// ============================== 策划分析 ==============================
+function renderPlan(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-file-signature"></i></div><div class="stat-value">10</div><div class="stat-label">分析维度</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-brain"></i></div><div class="stat-value">AI</div><div class="stat-label">智能分析引擎</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-scale-balanced"></i></div><div class="stat-value">5级</div><div class="stat-label">风险评级体系</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-clock"></i></div><div class="stat-value">30s</div><div class="stat-label">平均分析耗时</div></div>'
+    + '</div>'
+    + '<div class="grid-1-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-clipboard-list"></i> 方案信息</h3></div>'
+    + '<div class="form-group"><label>方案名称</label><input type="text" id="planName" placeholder="例如：Q3新品上市公关方案"></div>'
+    + '<div class="form-group"><label>方案类型</label><input type="text" id="planType" placeholder="例如：产品发布/危机公关/品牌升级"></div>'
+    + '<div class="form-group"><label>目标受众</label><input type="text" id="planAudience" placeholder="例如：科技爱好者/普通消费者"></div>'
+    + '<div class="form-group"><label>方案内容描述</label><textarea id="planContent" rows="8" placeholder="详细描述方案的核心内容、传播策略、预期效果..."></textarea></div>'
+    + '<button class="btn-primary" onclick="doPlanAnalyze()"><i class="fa-solid fa-magnifying-glass-chart"></i> 开始10维风险分析</button></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-chart-simple"></i> 分析维度</h3></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + ['舆论风险','法律风险','竞品反应','受众接受度','传播路径','媒体态度','政策风险','时间窗口','平台适配','KOL风险'].map(function(d){return '<div class="alert-item" style="margin-top:0"><i class="fa-solid fa-circle-check" style="color:var(--accent-green);margin-right:8px"></i>'+d+'</div>';}).join('')
+    + '</div></div></div><div id="planResult"></div></div>';
+}
+
+function doPlanAnalyze() {
+  var name = document.getElementById('planName').value.trim();
+  var type = document.getElementById('planType').value.trim();
+  var content = document.getElementById('planContent').value.trim();
+  if (!name||!content) return alert('请填写方案名称和内容');
+  var el = document.getElementById('planResult');
+  el.innerHTML = '<div class="glass-card mt-2" style="text-align:center"><div class="loading-spinner" style="margin:0 auto"></div><p class="text-dim mt-2">AI 10维度风险分析中...</p></div>';
+
+  setTimeout(function(){
+    var scores = {overall:72,dimensions:[
+      {name:'舆论风险',score:65,level:'中风险',comment:'方案涉及敏感话题，建议准备舆情预案'},
+      {name:'法律风险',score:85,level:'低风险',comment:'未发现明显法律合规问题'},
+      {name:'竞品反应',score:58,level:'中高风险',comment:'竞品可能在价格维度发起反击'},
+      {name:'受众接受度',score:78,level:'低风险',comment:'目标受众对类似方案接受度较高'},
+      {name:'传播路径',score:70,level:'中风险',comment:'建议增加短视频平台的传播资源'},
+      {name:'媒体态度',score:74,level:'低风险',comment:'核心媒体关系良好，可获得正面报道'},
+      {name:'政策风险',score:82,level:'低风险',comment:'当前政策环境下方案合规性良好'},
+      {name:'时间窗口',score:60,level:'中高风险',comment:'与行业峰会时间冲突，建议调整'},
+      {name:'平台适配',score:76,level:'低风险',comment:'方案在各主流平台均有适配策略'},
+      {name:'KOL风险',score:68,level:'中风险',comment:'建议增加备选KOL名单以防合作变动'}
+    ]};
+    el.innerHTML = '<div class="glass-card mt-2"><div class="card-header"><h3><i class="fa-solid fa-clipboard-check"></i> 分析结果: '+name+'</h3><span class="severity" style="font-size:14px;padding:6px 16px;background:rgba(245,158,11,0.12);color:var(--accent-orange)">综合评分: '+scores.overall+'/100</span></div>'
+      + '<table class="data-table"><thead><tr><th>分析维度</th><th>评分</th><th>风险等级</th><th>AI分析</th></tr></thead><tbody>'
+      + scores.dimensions.map(function(d){
+        var color = d.score>=80?'var(--accent-green)':(d.score>=70?'var(--accent-cyan)':(d.score>=60?'var(--accent-orange)':'var(--risk-high)'));
+        var sevClass = d.score>=80?'low':(d.score>=70?'medium':(d.score>=60?'high':'critical'));
+        return '<tr><td><strong>'+d.name+'</strong></td><td><span style="color:'+color+';font-weight:700;font-size:16px">'+d.score+'</span></td><td><span class="severity '+sevClass+'">'+d.level+'</span></td><td>'+d.comment+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }, 2000);
+}
+
+// ============================== 自动回应 ==============================
+var responseTypes = [
+  {id:'official_statement',label:'官方声明',icon:'fa-file-contract',desc:'适合对外正式发布的官方立场声明'},
+  {id:'media_talking_points',label:'媒体话术',icon:'fa-microphone',desc:'供发言人使用的媒体沟通口径'},
+  {id:'internal_alignment',label:'内部口径',icon:'fa-users',desc:'内部员工统一对外沟通话术'},
+  {id:'kol_outreach',label:'KOL沟通',icon:'fa-user-group',desc:'与关键意见领袖的沟通模板'},
+  {id:'legal_notice',label:'法律函件',icon:'fa-scale-balanced',desc:'正式法律文件草稿'}
+];
+
+function renderResponse(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-file-lines"></i></div><div class="stat-value">5</div><div class="stat-label">回应模板类型</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-robot"></i></div><div class="stat-value">AI</div><div class="stat-label">智能生成引擎</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-bolt"></i></div><div class="stat-value">15s</div><div class="stat-label">平均生成耗时</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-clock-rotate-left"></i></div><div class="stat-value">12</div><div class="stat-label">历史生成记录</div></div>'
+    + '</div>'
+    + '<div class="grid-1-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-pen-to-square"></i> 事件描述</h3></div>'
+    + '<textarea id="respIncident" rows="6" placeholder="详细描述舆情事件：时间、地点、涉及方、核心争议点、当前传播态势..."></textarea>'
+    + '<div class="form-group mt-2"><label>严重程度</label><select id="respSeverity"><option value="low">低 - 常规问询</option><option value="medium" selected>中 - 需要正式回应</option><option value="high">高 - 品牌声誉受威胁</option><option value="critical">危急 - 重大危机事件</option></select></div>'
+    + '<div class="btn-group mt-2">'+responseTypes.map(function(t){return '<button class="btn-secondary btn-sm" onclick="genResponse(\''+t.id+'\')"><i class="fa-solid '+t.icon+'"></i> '+t.label+'</button>';}).join('')+'</div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-circle-info"></i> 模板说明</h3></div>'
+    + responseTypes.map(function(t){return '<div class="alert-item" style="margin-top:4px;border-left-color:var(--accent-cyan)"><strong><i class="fa-solid '+t.icon+'"></i> '+t.label+'</strong><p class="text-dim" style="font-size:12px">'+t.desc+'</p></div>';}).join('')
+    + '</div></div><div id="respResult"></div></div>';
+}
+
+function genResponse(type) {
+  var incident = document.getElementById('respIncident').value.trim();
+  if (!incident) return alert('请描述舆情事件');
+  var severity = document.getElementById('respSeverity').value;
+  var typeInfo = responseTypes.find(function(t){return t.id===type;});
+  var el = document.getElementById('respResult');
+  el.innerHTML = '<div class="glass-card mt-2 response-card"><div class="card-header"><h3><i class="fa-solid '+typeInfo.icon+'"></i> '+typeInfo.label+'草稿</h3><span class="severity medium">生成中...</span></div><div style="text-align:center;padding:40px"><div class="loading-spinner" style="margin:0 auto"></div><p class="text-dim mt-2">AI正在生成'+typeInfo.label+'...</p></div></div>';
+
+  setTimeout(function(){
+    var templates = {
+      official_statement: '关于近期相关舆情的声明\n\n近日，我司关注到网络上有关[事件核心]的讨论。对此，我司高度重视，经内部核查，现声明如下：\n\n一、我司始终坚持诚信经营、用户至上的原则，对任何可能影响用户体验的问题均持零容忍态度。\n\n二、针对此次事件，我司已成立专项工作组进行全面调查，并将于48小时内公布调查结果。\n\n三、我们将持续优化服务体系，欢迎社会各界监督。如有任何疑问，请联系我司客服热线。\n\n知舆科技\n'+new Date().toLocaleDateString(),
+      media_talking_points: '媒体沟通口径\n\n【核心立场】\n知舆科技始终将用户权益放在首位。针对此次事件，我们已启动内部核查程序，并将透明公开地沟通进展。\n\n【关键信息点】\n1. 事件仍在调查中，初步判断为个别案例\n2. 已与相关用户取得联系并妥善处理\n3. 长效机制：正在升级监测系统以避免类似情况\n\n【应对建议】\n- 强调公司在行业中的领先地位和良好口碑\n- 将话题引导至公司技术创新和产品优势\n- 避免与竞品进行直接对比或指责\n\n【不适合回答的问题】\n- 具体赔偿金额（待法务确认）\n- 涉事员工个人信息（隐私保护）',
+      internal_alignment: '内部统一口径\n\n致全体员工：\n\n关于近期外部舆论事件，请大家统一按以下口径对外沟通：\n\n1. 公司已知悉相关情况，正在积极处理中\n2. 具体情况请以公司官方公告为准\n3. 请勿在社交媒体发表个人评论或猜测\n4. 如遇媒体采访请求，请转至公关部统一对接\n\n【严禁行为】\n- 私自接受媒体采访\n- 在社交平台发表未经审核的言论\n- 向外界透露内部调查细节\n\n公关部联系人：[待填]\n生效时间：即日起',
+      kol_outreach: 'KOL沟通模板\n\n尊敬的[KOL名称]老师：\n\n您好！我是知舆科技公关部的[姓名]。\n\n近期您可能关注到了关于我司的一些讨论。我们非常重视您的意见和影响力，特此与您同步最新情况：\n\n1. 我司已启动全面调查，初步结论将于近日公布\n2. 我司愿意提供独家信息和采访机会，供您客观报道\n3. 如有任何信息需求，我们将第一时间配合\n\n一直以来，我们非常尊重您在行业中的专业判断。希望有机会与您深入交流，共同促进行业健康发展。\n\n期待您的回复。\n\n知舆科技公关部\n[联系方式]',
+      legal_notice: '律师函\n\n致：[相关方名称]\n\n本所受知舆科技有限公司委托，就贵方在网络平台发布不实信息一事，郑重致函如下：\n\n经查，贵方于[日期]在[平台]发布的[内容描述]中，包含针对委托人的不实陈述，对委托人商誉造成严重损害，已构成名誉侵权。\n\n根据《中华人民共和国民法典》第一千零二十四条之规定，现要求贵方：\n\n1. 于收到本函后24小时内删除全部不实内容\n2. 于原发布平台发布更正声明\n3. 停止一切侵害委托人商誉的行为\n\n如贵方未在上述期限内履行，本所将依据委托人授权，依法提起诉讼，追究贵方法律责任。\n\n[律师事务所名称]\n承办律师：[姓名]\n'+new Date().toLocaleDateString()
+    };
+
+    var content = templates[type] || '生成失败';
+    el.innerHTML = '<div class="glass-card mt-2 response-card"><div class="card-header"><h3><i class="fa-solid '+typeInfo.icon+'"></i> '+typeInfo.label+'草稿</h3><span class="severity low">AI生成</span></div>'
+      + '<textarea readonly style="min-height:240px;font-family:\'SF Mono\',\'Consolas\',monospace;font-size:13px;line-height:1.8">'+content+'</textarea>'
+      + '<div class="btn-group mt-2"><button class="btn-primary btn-sm" onclick="copyResponse(this)"><i class="fa-solid fa-copy"></i> 复制内容</button><button class="btn-sm" onclick="genResponse(\''+type+'\')"><i class="fa-solid fa-rotate"></i> 重新生成</button></div></div>';
+  }, 1500);
+}
+
+function copyResponse(btn) {
+  var ta = btn.parentElement.previousElementSibling;
+  if (ta&&ta.tagName==='TEXTAREA') {
+    ta.select();
+    document.execCommand('copy');
+    showToast('已复制到剪贴板','success');
+  }
+}
+
+// ============================== 报告中心 ==============================
+var reportArchives = [
+  {type:'daily',label:'日报',date:'2026-08-10',title:'知舆科技舆情日报(8月10日)',pages:4,status:'completed'},
+  {type:'weekly',label:'周报',date:'2026-08-09',title:'知舆科技舆情周报(第32周)',pages:12,status:'completed'},
+  {type:'monthly',label:'月报',date:'2026-08-01',title:'知舆科技舆情月报(7月)',pages:28,status:'completed'},
+  {type:'incident',label:'事件分析',date:'2026-08-08',title:'新品发布舆情专项分析报告',pages:8,status:'completed'},
+  {type:'competitor',label:'竞品对比',date:'2026-08-05',title:'Q3竞品舆情对比分析报告',pages:16,status:'completed'}
+];
+
+function renderReports(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-file-lines"></i></div><div class="stat-value">5</div><div class="stat-label">报告模板类型</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-folder-open"></i></div><div class="stat-value">'+reportArchives.length+'</div><div class="stat-label">已归档报告</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-file-pdf"></i></div><div class="stat-value">PDF</div><div class="stat-label">多格式导出</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-bolt"></i></div><div class="stat-value">Auto</div><div class="stat-label">定时自动生成</div></div>'
+    + '</div>'
+    + '<div class="grid-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> 生成新报告</h3></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + [
+      {id:'daily',icon:'fa-calendar-day',label:'日报',desc:'24小时舆情汇总'},
+      {id:'weekly',icon:'fa-calendar-week',label:'周报',desc:'7日趋势与要闻'},
+      {id:'monthly',icon:'fa-calendar',label:'月报',desc:'月度深度分析'},
+      {id:'incident',icon:'fa-bolt',label:'事件分析',desc:'专项事件复盘'},
+      {id:'competitor',icon:'fa-chart-simple',label:'竞品对比',desc:'多品牌横向对比'}
+    ].map(function(r){return '<div class="alert-item" style="cursor:pointer;border-left-color:var(--accent-cyan);margin-top:4px" onclick="genReport(\''+r.id+'\')"><strong><i class="fa-solid '+r.icon+'"></i> '+r.label+'</strong><p class="text-dim" style="font-size:12px">'+r.desc+'</p></div>';}).join('')
+    + '</div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-archive"></i> 报告归档</h3></div>'
+    + '<table class="data-table"><thead><tr><th>报告名称</th><th>类型</th><th>生成日期</th><th>页数</th><th>状态</th><th>操作</th></tr></thead><tbody>'
+    + reportArchives.map(function(r){return '<tr><td><strong>'+r.title+'</strong></td><td><span class="tag">'+r.label+'</span></td><td>'+r.date+'</td><td>'+r.pages+'页</td><td><span class="status-dot green"></span>已完成</td><td><div class="btn-group"><button class="btn-sm">预览</button><button class="btn-sm">下载</button></div></td></tr>';}).join('')
+    + '</tbody></table></div></div><div id="reportGenStatus"></div></div>';
+}
+
+function genReport(type) {
+  var names = {daily:'日报',weekly:'周报',monthly:'月报',incident:'事件分析报告',competitor:'竞品对比报告'};
+  var el = document.getElementById('reportGenStatus');
+  el.innerHTML = '<div class="glass-card mt-2"><div class="alert-item" style="border-left-color:var(--accent-cyan)"><strong><i class="fa-solid fa-hourglass-half"></i> '+names[type]+'</strong><span class="text-dim"> 生成中...</span></div></div>';
+  setTimeout(function(){
+    var now = new Date().toLocaleString();
+    var newReport = {type:type,label:names[type],date:new Date().toISOString().slice(0,10),title:'知舆科技舆情'+names[type]+'('+new Date().toLocaleDateString()+')',pages:Math.floor(Math.random()*20)+4,status:'completed'};
+    reportArchives.unshift(newReport);
+    el.innerHTML = '<div class="glass-card mt-2"><div class="alert-item" style="border-left-color:var(--accent-green)"><strong><i class="fa-solid fa-circle-check"></i> '+names[type]+'</strong><span class="text-dim"> '+now+'</span><p style="color:var(--accent-green);font-size:13px">报告已生成: '+newReport.pages+'页 | 格式: PDF/HTML</p><div class="btn-group mt-1"><button class="btn-primary btn-sm"><i class="fa-solid fa-download"></i> 下载PDF</button><button class="btn-sm"><i class="fa-solid fa-code"></i> 导出HTML</button></div></div></div>';
+    renderReports(document.getElementById('mainContent'));
+  }, 2000);
+}
+
+// ============================== 品牌管理 ==============================
+function renderBrand(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="grid-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-building"></i> 品牌信息</h3></div>'
+    + '<div class="form-group"><label>品牌名称</label><input type="text" id="brandName" value="知舆科技" placeholder="品牌名称"></div>'
+    + '<div class="form-group"><label>所属行业</label><input type="text" id="brandIndustry" value="人工智能/企业服务" placeholder="所属行业"></div>'
+    + '<div class="form-group"><label>品牌简介</label><textarea id="brandDesc" rows="3" placeholder="品牌简介...">知舆科技是一家专注于AI舆情监测与品牌管理的高科技企业，致力于为企业客户提供全方位的舆情监控、预警、分析和应对解决方案。</textarea></div>'
+    + '<div class="form-group"><label>竞品名称</label><input type="text" id="brandCompetitors" value="竞品Alpha, 竞品Beta, 竞品Gamma" placeholder="逗号分隔"></div>'
+    + '<button class="btn-primary" onclick="saveBrand()"><i class="fa-solid fa-floppy-disk"></i> 保存品牌信息</button><div id="brandResult"></div></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-credit-card"></i> 订阅信息</h3></div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-purple);margin-top:0"><strong>当前方案:</strong> 企业版</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-green)"><strong>订阅状态:</strong> 试用中 (30天免费试用)</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-cyan)"><strong>到期时间:</strong> 2026-09-09</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-orange)"><strong>监测配额:</strong> 10个关键词 | 6个平台 | 无限报告</div>'
+    + '<button class="btn-secondary mt-2" style="width:100%"><i class="fa-solid fa-arrow-up-right-from-square"></i> 升级订阅方案</button></div></div></div>';
+}
+
+function saveBrand() {
+  document.getElementById('brandResult').innerHTML = '<p style="color:var(--accent-green)" class="mt-2"><i class="fa-solid fa-circle-check"></i> 品牌信息已保存 (Demo模式)</p>';
+  showToast('品牌信息已保存','success');
+}
+
+// ============================== 审计日志 ==============================
+var auditLogs = [
+  {time:'2026-08-10 10:32:15',user:'admin',action:'登录系统',resource:'系统',ip:'192.168.1.100',status:'成功'},
+  {time:'2026-08-10 10:28:42',user:'admin',action:'查看监控大盘',resource:'dashboard',ip:'192.168.1.100',status:'成功'},
+  {time:'2026-08-10 10:15:33',user:'zhangwei',action:'添加预警规则',resource:'alerts/rule/3',ip:'192.168.1.105',status:'成功'},
+  {time:'2026-08-10 09:58:11',user:'zhangwei',action:'生成舆情日报',resource:'reports/daily',ip:'192.168.1.105',status:'成功'},
+  {time:'2026-08-10 09:45:07',user:'admin',action:'修改品牌信息',resource:'brand/profile',ip:'192.168.1.100',status:'成功'},
+  {time:'2026-08-10 09:30:22',user:'liming',action:'删除关键词',resource:'monitor/keywords/竞品分析',ip:'192.168.1.102',status:'成功'},
+  {time:'2026-08-10 09:12:45',user:'liming',action:'AI智能扩展关键词',resource:'monitor/smart-expand',ip:'192.168.1.102',status:'成功'},
+  {time:'2026-08-10 08:55:30',user:'zhangwei',action:'导出竞品对比报告',resource:'reports/competitor',ip:'192.168.1.105',status:'成功'},
+  {time:'2026-08-10 08:40:18',user:'admin',action:'修改预警规则阈值',resource:'alerts/rule/1',ip:'192.168.1.100',status:'成功'},
+  {time:'2026-08-10 08:25:09',user:'liming',action:'查看传播追踪图',resource:'spread/incident_5',ip:'192.168.1.102',status:'成功'},
+  {time:'2026-08-10 08:10:55',user:'zhangwei',action:'生成自动回应',resource:'response/official_statement',ip:'192.168.1.105',status:'成功'},
+  {time:'2026-08-10 08:00:01',user:'system',action:'定时监测快照采集',resource:'scheduler/snapshot',ip:'127.0.0.1',status:'成功'}
+];
+
+function renderAudit(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="stat-row">'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-cyan)"><i class="fa-solid fa-list-ol"></i></div><div class="stat-value">'+auditLogs.length+'</div><div class="stat-label">今日操作记录</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-green)"><i class="fa-solid fa-user-check"></i></div><div class="stat-value">3</div><div class="stat-label">活跃用户</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-purple)"><i class="fa-solid fa-shield-halved"></i></div><div class="stat-value">100%</div><div class="stat-label">操作成功率</div></div>'
+    + '<div class="stat-card"><div class="stat-icon" style="color:var(--accent-orange)"><i class="fa-solid fa-clock-rotate-left"></i></div><div class="stat-value">90d</div><div class="stat-label">日志保留期</div></div>'
+    + '</div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-clock-rotate-left"></i> 操作审计日志</h3><div class="btn-group"><button class="btn-sm active">全部</button><button class="btn-sm">今天</button><button class="btn-sm">本周</button><button class="btn-sm">本月</button></div></div>'
+    + '<table class="data-table"><thead><tr><th>时间</th><th>用户</th><th>操作</th><th>资源</th><th>IP地址</th><th>状态</th></tr></thead><tbody>'
+    + auditLogs.map(function(l){
+      var statusColor = l.status==='成功'?'var(--accent-green)':'var(--risk-high)';
+      var userColor = l.user==='system'?'var(--accent-purple)':(l.user==='admin'?'var(--accent-cyan)':'var(--text-dim)');
+      return '<tr><td class="mono">'+l.time+'</td><td><span style="color:'+userColor+'"><i class="fa-solid fa-circle" style="font-size:6px;margin-right:4px"></i>'+l.user+'</span></td><td>'+l.action+'</td><td class="mono">'+l.resource+'</td><td class="mono">'+l.ip+'</td><td><span style="color:'+statusColor+'">'+l.status+'</span></td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+}
+
+// ============================== 设置 ==============================
+function renderSettings(mc) {
+  mc.innerHTML = '<div class="fade-in">'
+    + '<div class="grid-2">'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-circle-user"></i> 账号信息</h3></div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-cyan);margin-top:0"><strong>用户名:</strong> Demo企业</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-purple)"><strong>版本:</strong> 企业版</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-green)"><strong>订阅:</strong> enterprise (试用中)</div>'
+    + '<div class="alert-item" style="border-left-color:var(--accent-orange)"><strong>到期时间:</strong> 2026-09-09</div>'
+    + '<button class="btn-primary mt-2" style="width:100%" onclick="switchToPersonal()"><i class="fa-solid fa-arrow-left"></i> 切换到个人版</button></div>'
+    + '<div class="glass-card"><div class="card-header"><h3><i class="fa-solid fa-sliders"></i> 偏好设置</h3></div>'
+    + '<div class="alert-item" style="margin-top:0;display:flex;justify-content:space-between;align-items:center"><span>数据自动刷新</span><label class="btn-sm active" style="cursor:pointer"><input type="checkbox" checked> 开启 (每5分钟)</label></div>'
+    + '<div class="alert-item" style="display:flex;justify-content:space-between;align-items:center"><span>预警邮件通知</span><label class="btn-sm active" style="cursor:pointer"><input type="checkbox" checked> 开启</label></div>'
+    + '<div class="alert-item" style="display:flex;justify-content:space-between;align-items:center"><span>预警短信通知</span><label class="btn-sm" style="cursor:pointer"><input type="checkbox"> 关闭</label></div>'
+    + '<div class="alert-item" style="display:flex;justify-content:space-between;align-items:center"><span>每日报告自动发送</span><label class="btn-sm active" style="cursor:pointer"><input type="checkbox" checked> 08:00 发送</label></div>'
+    + '<div class="alert-item" style="display:flex;justify-content:space-between;align-items:center"><span>竞品异常自动预警</span><label class="btn-sm active" style="cursor:pointer"><input type="checkbox" checked> 开启</label></div></div></div></div>';
+}
+
+// ============================== 通用功能 ==============================
+function switchToPersonal() {
+  try { ZhiYuStore.switchVersion('personal'); } catch(e) {}
+  window.location.href = '/';
+}
+
+function doLogin(e) {
+  e.preventDefault();
+  try {
+    fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:document.getElementById('lId').value,password:document.getElementById('lPw').value})})
+      .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}});})
+      .then(function(r){if(!r.ok)throw new Error(r.d.detail);return r.d;})
+      .then(function(d){return fetch('/auth/me',{headers:{'Authorization':'Bearer '+d.access_token}}).then(function(r){return r.json();}).then(function(me){ZhiYuStore.setToken(d.access_token,me);return me;});})
+      .then(function(me){document.getElementById('authModal').classList.remove('active');document.getElementById('headerUser').textContent=me.username;if(me.user_type!=='enterprise')ZhiYuStore.switchVersion('enterprise');navTo('dashboard');})
+      .catch(function(e){alert('登录失败: '+e.message);});
+  } catch(e) { alert('登录失败: '+e.message); }
+}
+
+function logout() { try{ZhiYuStore.logout();}catch(e){} window.location.href='/'; }
+
+function showToast(msg,type) {
+  var container = document.querySelector('.toast-container');
+  if (!container) { container = document.createElement('div'); container.className = 'toast-container'; document.body.appendChild(container); }
+  var toast = document.createElement('div'); toast.className = 'toast '+(type||'info'); toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(function(){ toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(function(){toast.remove();},300); }, 2500);
+}
+
+// ============================== 搜索 ==============================
+var mockSearchData = [
+  {platform:'微博',title:'知舆科技Q3新品发布引发行业热议，AI舆情监测成焦点',sentiment:'positive',time:'10分钟前',url:'#'},
+  {platform:'抖音',title:'深度体验知舆企业版：一站式品牌舆情管理平台',sentiment:'positive',time:'25分钟前',url:'#'},
+  {platform:'知乎',title:'如何看待知舆科技完成C轮融资？估值突破50亿',sentiment:'neutral',time:'1小时前',url:'#'},
+  {platform:'小红书',title:'品牌公关人必备：知舆舆情监测使用心得分享',sentiment:'positive',time:'2小时前',url:'#'},
+  {platform:'微博',title:'知舆平台突发故障？官方回应：已在修复中',sentiment:'negative',time:'3小时前',url:'#'},
+  {platform:'B站',title:'知舆企业版vs传统舆情公司：效率提升10倍的秘密',sentiment:'neutral',time:'4小时前',url:'#'},
+  {platform:'快手',title:'AI舆情监测工具横评：知舆排名第一',sentiment:'positive',time:'5小时前',url:'#'},
+  {platform:'微博',title:'某品牌危机公关翻车，知舆提前48小时预警',sentiment:'positive',time:'6小时前',url:'#'},
+  {platform:'抖音',title:'企业公关部都在用的舆情神器：知舆',sentiment:'positive',time:'7小时前',url:'#'},
+  {platform:'知乎',title:'2026年舆情监测行业报告：知舆市场份额第一',sentiment:'positive',time:'8小时前',url:'#'}
+];
+
+function mockSearch() {
+  var query = document.getElementById('globalSearch').value.trim();
+  if (!query) return;
+
+  var overlay = document.getElementById('searchOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'searchOverlay';
+    overlay.className = 'search-overlay';
+    overlay.innerHTML = '<button class="close-search" onclick="closeSearch()"><i class="fa-solid fa-xmark"></i></button><div style="max-width:800px;margin:0 auto"><h2 style="margin-bottom:24px"><i class="fa-solid fa-magnifying-glass"></i> 舆情搜索结果</h2><div id="searchResults"></div></div>';
+    document.body.appendChild(overlay);
+  }
+  overlay.classList.add('show');
+
+  // 根据搜索词过滤结果，同时生成一些动态假数据
+  var results = mockSearchData.filter(function(item){
+    return item.title.indexOf(query)>=0 || item.platform.indexOf(query)>=0;
+  });
+
+  // 如果没匹配到，生成包含搜索词的假数据
+  if (results.length === 0) {
+    results = [
+      {platform:'微博',title:'关于"'+query+'"的最新讨论持续升温',sentiment:'neutral',time:'刚刚',url:'#'},
+      {platform:'知乎',title:'如何评价"'+query+'"?业内人士深度分析',sentiment:'neutral',time:'30分钟前',url:'#'},
+      {platform:'抖音',title:'"'+query+'"相关话题登上热搜',sentiment:'positive',time:'1小时前',url:'#'},
+      {platform:'小红书',title:'关于"'+query+'"的真实用户反馈汇总',sentiment:'positive',time:'2小时前',url:'#'},
+      {platform:'微博',title:'"'+query+'"引发的争议仍在发酵',sentiment:'negative',time:'3小时前',url:'#'}
+    ];
+  }
+
+  var html = '<p class="text-dim mb-2">找到 <strong style="color:var(--accent-cyan)">'+results.length+'</strong> 条相关结果（模拟数据）</p>';
+  results.forEach(function(r){
+    var sIcon = r.sentiment==='positive'?'<i class="fa-solid fa-circle" style="color:var(--accent-green);font-size:8px;margin-right:4px"></i>':(r.sentiment==='negative'?'<i class="fa-solid fa-circle" style="color:var(--risk-high);font-size:8px;margin-right:4px"></i>':'<i class="fa-solid fa-circle" style="color:var(--text-muted);font-size:8px;margin-right:4px"></i>');
+    html += '<div class="search-result-item">'
+      + '<span class="platform-tag">'+r.platform+'</span>'+sIcon+'<strong>'+r.title+'</strong>'
+      + '<span class="text-muted" style="margin-left:8px;font-size:11px">'+r.time+'</span>'
+      + '</div>';
+  });
+  document.getElementById('searchResults').innerHTML = html;
+}
+
+function closeSearch() {
+  var overlay = document.getElementById('searchOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+// 初始化
+navTo('dashboard');
+</script>
+
+<div class="search-overlay" id="searchOverlay">
+  <button class="close-search" onclick="closeSearch()"><i class="fa-solid fa-xmark"></i></button>
+  <div style="max-width:800px;margin:0 auto">
+    <h2 style="margin-bottom:24px"><i class="fa-solid fa-magnifying-glass"></i> 舆情搜索结果</h2>
+    <div id="searchResults"></div>
+  </div>
+</div>
+
+</body>
+</html>

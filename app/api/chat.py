@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+import random
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_current_user
+from app.models.user import User
 from app.schemas.chat import ChatRequest, ChatResponse, MotivationResponse
 from app.services.baichuan_service import chat_with_ai
-import random
-from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -18,7 +21,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         {
             "role": "system",
             "content": (
-                "你是知舆系统的AI助手“知知”，一只智慧的猫头鹰。"
+                "你是知舆系统的AI助手「知知」，一只智慧的猫头鹰。"
                 "你帮助自媒体作者分析视频舆论风险，提供情绪支持。"
                 "回答要温暖、专业、有同理心。"
             ),
@@ -32,20 +35,21 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/motivation", response_model=MotivationResponse)
-async def get_motivation(user_id: int = 1, db: AsyncSession = Depends(get_db)):
-    """
-    获取针对用户的个性化鼓励语
-    """
+async def get_motivation(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取针对用户的个性化鼓励语"""
     from app.models.video_analysis import VideoAnalysis
     from app.models.monitor import MonitorRecord
 
-    # 总分析次数
+    user_id = current_user.id
+
     total_row = await db.execute(
         select(func.count(VideoAnalysis.id)).where(VideoAnalysis.user_id == user_id)
     )
     total = total_row.scalar() or 0
 
-    # 近一周上传数
     week_ago = datetime.now() - timedelta(days=7)
     recent_row = await db.execute(
         select(func.count(VideoAnalysis.id)).where(
@@ -55,7 +59,6 @@ async def get_motivation(user_id: int = 1, db: AsyncSession = Depends(get_db)):
     )
     recent = recent_row.scalar() or 0
 
-    # 平均风险分数（最近3次）
     risks_row = await db.execute(
         select(VideoAnalysis.risk_score)
         .where(VideoAnalysis.user_id == user_id, VideoAnalysis.risk_score.isnot(None))
@@ -65,13 +68,11 @@ async def get_motivation(user_id: int = 1, db: AsyncSession = Depends(get_db)):
     risks = [r[0] for r in risks_row.fetchall() if r[0] is not None]
     avg_risk = sum(risks) / len(risks) if risks else None
 
-    # 监测记录数
     monitored_row = await db.execute(
         select(func.count(MonitorRecord.id)).where(MonitorRecord.user_id == user_id)
     )
     monitored = monitored_row.scalar() or 0
 
-    # 生成鼓励语
     templates = []
 
     if total == 0:

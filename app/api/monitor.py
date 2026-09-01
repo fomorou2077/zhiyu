@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.monitor import MonitorRecord
 from app.models.user import User
 from app.schemas.monitor import (
@@ -25,30 +26,21 @@ router = APIRouter(prefix="/monitor", tags=["monitor"])
 
 
 @router.post("/fetch", response_model=MonitorResponse)
-async def fetch_and_analyze(request: MonitorRequest, db: AsyncSession = Depends(get_db)):
-    """
-    监测视频接口
-    
-    1. 抓取视频信息和评论
-    2. 分析评论情绪
-    3. 保存监测记录
-    4. 返回分析结果
-    """
+async def fetch_and_analyze(
+    request: MonitorRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """监测视频接口"""
     try:
-        # 1. 抓取视频信息（包括评论）
         logger.info("开始抓取视频信息: {}", request.url)
         video_info = await fetch_video_info(request.url)
-        
-        # 2. 分析评论情绪
+
         logger.info("开始分析评论情绪，共 {} 条评论", len(video_info.comments))
         analysis = await analyze_comments(video_info.comments)
-        
-        # 3. 获取用户ID（临时使用用户ID=1）
-        user_id = 1
-        
-        # 4. 保存监测记录
+
         record = MonitorRecord(
-            user_id=user_id,
+            user_id=current_user.id,
             platform=video_info.platform,
             video_url=request.url,
             video_id=video_info.video_id,
@@ -62,10 +54,9 @@ async def fetch_and_analyze(request: MonitorRequest, db: AsyncSession = Depends(
         db.add(record)
         await db.commit()
         await db.refresh(record)
-        
+
         logger.info("监测记录保存成功: id={}, title={}", record.id, record.title)
-        
-        # 5. 返回结果
+
         return MonitorResponse(
             id=record.id,
             platform=record.platform,
@@ -77,7 +68,7 @@ async def fetch_and_analyze(request: MonitorRequest, db: AsyncSession = Depends(
             analysis=analysis,
             created_at=record.created_at.isoformat() if record.created_at else datetime.now().isoformat()
         )
-        
+
     except Exception as e:
         logger.exception("监测失败: {}", e)
         raise HTTPException(status_code=500, detail=f"监测失败: {str(e)}")
@@ -86,26 +77,19 @@ async def fetch_and_analyze(request: MonitorRequest, db: AsyncSession = Depends(
 @router.get("/records", response_model=List[MonitorRecordResponse])
 async def get_monitor_records(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    获取监测记录列表
-    
-    Args:
-        limit: 返回记录数量限制，默认20条
-    """
+    """获取监测记录列表"""
     try:
-        # 临时使用用户ID=1
-        user_id = 1
-        
         result = await db.execute(
             select(MonitorRecord)
-            .where(MonitorRecord.user_id == user_id)
+            .where(MonitorRecord.user_id == current_user.id)
             .order_by(desc(MonitorRecord.created_at))
             .limit(limit)
         )
         records = result.scalars().all()
-        
+
         return [
             MonitorRecordResponse(
                 id=record.id,
@@ -124,19 +108,23 @@ async def get_monitor_records(
 
 
 @router.get("/records/{record_id}")
-async def get_monitor_record_detail(record_id: int, db: AsyncSession = Depends(get_db)):
-    """
-    获取单条监测记录的详细信息
-    """
+async def get_monitor_record_detail(
+    record_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取单条监测记录的详细信息"""
     try:
         result = await db.execute(
             select(MonitorRecord).where(MonitorRecord.id == record_id)
         )
         record = result.scalar_one_or_none()
-        
+
         if not record:
             raise HTTPException(status_code=404, detail="记录不存在")
-        
+        if record.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="无权访问此记录")
+
         return {
             "id": record.id,
             "platform": record.platform,

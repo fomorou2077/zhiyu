@@ -7,6 +7,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.video_analysis import VideoAnalysis
 from app.models.monitor import MonitorRecord
@@ -41,34 +42,23 @@ async def get_emotion_trends(
 
 @router.get("/creator-stats", response_model=CreatorStatsResponse)
 async def get_creator_stats(
-    user_id: int = Query(1, description="用户ID，临时参数"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """
-    获取创作者数据分析
-
-    包括：
-    - 创作领域判定
-    - 同类创作者排名
-    - 近30天热度趋势
-    - 最佳/最差视频
-    - 改进建议
-    """
+    """获取创作者数据分析"""
+    user_id = current_user.id
     logger.info("获取创作者统计数据: user_id={}", user_id)
 
-    # 1. 获取用户所有历史分析记录（用于提取创作领域）
     result = await db.execute(
         select(VideoAnalysis).where(VideoAnalysis.user_id == user_id)
     )
     user_analyses = result.scalars().all()
 
-    # 2. 获取用户所有监测记录
     result = await db.execute(
         select(MonitorRecord).where(MonitorRecord.user_id == user_id)
     )
     monitor_records = result.scalars().all()
 
-    # 如果没有任何数据，返回空数据提示
     if not user_analyses and not monitor_records:
         return CreatorStatsResponse(
             domain="未确定",
@@ -84,14 +74,12 @@ async def get_creator_stats(
             avg_risk_score=0.0,
         )
 
-    # 3. 确定创作领域（取出现次数最多的 category）
     categories = [a.category for a in user_analyses if a.category]
     if categories:
         domain = Counter(categories).most_common(1)[0][0]
     else:
         domain = "其他"
 
-    # 4. 计算热度趋势（按天聚合，仅监测数据有真实热度）
     thirty_days_ago = datetime.now() - timedelta(days=30)
     recent_monitors = [r for r in monitor_records if r.created_at and r.created_at >= thirty_days_ago]
 
@@ -116,13 +104,9 @@ async def get_creator_stats(
             )
         )
 
-    # 5. 合并两种记录，计算综合热度得分
     videos = []
-
-    # 分析记录
     for a in user_analyses:
         created_date = a.created_at.date() if a.created_at else datetime.now().date()
-        # 风险越低得分越高
         score = max(0, 100 - (a.risk_score or 50))
         videos.append({
             "id": a.id,
@@ -135,10 +119,8 @@ async def get_creator_stats(
             "source": "analysis",
         })
 
-    # 监测记录
     for r in monitor_records:
         created_date = r.created_at.date() if r.created_at else datetime.now().date()
-        # 综合得分：点赞*0.5 + 评论*0.3 - 风险*0.2
         score = (r.like_count or 0) * 0.5 + (r.comment_count or 0) * 0.3 - (r.risk_score or 0) * 0.2
         videos.append({
             "id": r.id,
@@ -151,7 +133,6 @@ async def get_creator_stats(
             "source": "monitor",
         })
 
-    # 6. 找出最佳和最差视频
     best_video: Optional[VideoHeat] = None
     worst_video: Optional[VideoHeat] = None
 
@@ -179,26 +160,19 @@ async def get_creator_stats(
             score=round(worst["score"], 1),
         )
 
-    # 7. 统计汇总数据
     total_videos = len(videos)
     total_likes = sum(v.get("like_count", 0) for v in videos)
     total_comments = sum(v.get("comment_count", 0) for v in videos)
     avg_risk = sum(v.get("risk_score", 0) for v in videos) / total_videos if total_videos > 0 else 0.0
 
-    # 8. 排名功能（简化版：基于同领域用户统计）
-    # 这里暂时返回模拟排名，后续可扩展
-    ranking = 1  # 默认排名
-    total_creators = 1  # 默认只有自己
-
-    # 可以通过查询同 category 的所有用户来扩展
-    # 目前简化处理：如果有分析记录，基于用户数量估算
-    result = await db.execute(
+    ranking = 1
+    total_creators = 1
+    result2 = await db.execute(
         select(func.count(func.distinct(VideoAnalysis.user_id)))
     )
-    user_count = result.scalar() or 1
+    user_count = result2.scalar() or 1
     total_creators = max(1, user_count)
 
-    # 9. 生成建议
     suggestions = _generate_suggestions(domain, best_video, worst_video, avg_risk, total_videos)
 
     return CreatorStatsResponse(
@@ -226,7 +200,6 @@ def _generate_suggestions(
     """根据数据生成个性化建议"""
     suggestions = []
 
-    # 领域相关建议
     domain_advice = {
         "政治": "政治类内容需格外注意言论合规性，建议多参考官方媒体表述。",
         "社会": "社会热点话题关注度高，建议保持客观理性，避免过度情绪化。",
@@ -240,24 +213,20 @@ def _generate_suggestions(
 
     suggestions.append(domain_advice.get(domain, domain_advice["其他"]))
 
-    # 最佳视频建议
     if best_video:
         suggestions.append(f"您的视频「{best_video.title}」表现优异，可以分析其成功因素并复制。")
 
-    # 最差视频建议
     if worst_video:
         if worst_video.risk_score > 60:
             suggestions.append(f"「{worst_video.title}」风险评分较高，建议检查内容是否符合平台规范。")
         elif worst_video.like_count < 100:
             suggestions.append(f"「{worst_video.title}」互动较低，可以尝试优化标题和封面。")
 
-    # 风险评估建议
     if avg_risk > 70:
         suggestions.append("您的整体风险评分偏高，建议在发布前更加谨慎审核内容。")
     elif avg_risk < 30:
         suggestions.append("您的风险控制做得很好，继续保持！")
 
-    # 数据量建议
     if total_videos < 3:
         suggestions.append("数据积累还不够，建议多上传/监测几个视频以获得更精准的分析。")
 
@@ -266,10 +235,12 @@ def _generate_suggestions(
 
 @router.get("/summary")
 async def get_profile_summary(
-    user_id: int = Query(1, description="用户ID"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """获取档案摘要（简化版，用于快速展示）"""
+    """获取档案摘要"""
+    user_id = current_user.id
+
     result = await db.execute(
         select(VideoAnalysis).where(VideoAnalysis.user_id == user_id)
     )

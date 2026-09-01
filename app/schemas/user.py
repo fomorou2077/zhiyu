@@ -50,6 +50,11 @@ class UserLogin(BaseModel):
 class UserInDB(UserBase):
     id: int
     is_active: bool
+    user_type: str = "personal"
+    subscription_tier: str = "free"
+    subscription_expiry: Optional[datetime] = None
+    trial_started_at: Optional[datetime] = None
+    enterprise_brand: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -64,6 +69,8 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
+    user_id: Optional[int] = None
+    user_type: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -71,7 +78,16 @@ class UserResponse(BaseModel):
     username: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    user_type: str = "personal"
+    subscription_tier: str = "free"
+    subscription_expiry: Optional[datetime] = None
+    trial_started_at: Optional[datetime] = None
+    enterprise_brand: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class SwitchVersionRequest(BaseModel):
+    user_type: str  # "personal" 或 "enterprise"

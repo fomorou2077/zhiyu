@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知舆 · 个人版</title>
+<link rel="stylesheet" href="/web/shared/css/theme.css">
+<link rel="stylesheet" href="/web/shared/css/components.css">
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script defer src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  .app-layout { display: flex; height: 100vh; }
+  .sidebar {
+    width: 240px; min-width: 240px; background: rgba(10, 15, 40, 0.9);
+    border-right: 1px solid var(--card-border); padding: 20px 0;
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  .sidebar-header { padding: 0 20px 20px; border-bottom: 1px solid var(--card-border); margin-bottom: 12px; }
+  .sidebar-header h2 { font-size: 20px; background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .sidebar-section { padding: 8px 20px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .nav-item {
+    padding: 10px 20px; display: flex; align-items: center; gap: 12px;
+    cursor: pointer; color: var(--text-dim); transition: var(--transition);
+    font-size: 14px; border-left: 2px solid transparent;
+  }
+  .nav-item:hover { color: var(--text-main); background: rgba(255,255,255,0.03); }
+  .nav-item.active { color: var(--accent-cyan); background: rgba(0,242,255,0.08); border-left-color: var(--accent-cyan); }
+  .nav-item i { width: 18px; text-align: center; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-header {
+    padding: 16px 32px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--card-border); background: rgba(10,15,40,0.6);
+  }
+  .main-header h1 { font-size: 20px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .main-content { flex: 1; overflow-y: auto; padding: 24px 32px; }
+  .page { display: none; } .page.active { display: block; }
+
+  /* 上传区域 */
+  .upload-zone {
+    border: 2px dashed var(--card-border); border-radius: var(--radius);
+    padding: 48px; text-align: center; cursor: pointer; transition: var(--transition);
+  }
+  .upload-zone:hover { border-color: var(--accent-cyan); background: rgba(0,242,255,0.03); }
+  .upload-zone i { font-size: 48px; color: var(--accent-cyan); margin-bottom: 16px; }
+
+  /* 结果卡片 */
+  .result-card { margin-top: 24px; }
+  .result-card h3 { margin-bottom: 16px; }
+  .emotion-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .emotion-bar { }
+  .emotion-bar .label { font-size: 12px; color: var(--text-dim); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .emotion-bar .bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+  .emotion-bar .bar .fill { height: 100%; border-radius: 3px; background: var(--accent-cyan); transition: width 0.5s; }
+
+  /* 事实核查 */
+  .verdict-box { padding: 16px; border-radius: var(--radius-sm); margin-top: 16px; }
+  .verdict-box.true { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); }
+  .verdict-box.false { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); }
+  .verdict-box.misleading { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); }
+
+  /* 光谱 */
+  .spectrum-bar {
+    height: 40px; background: linear-gradient(to right, #ef4444, #f59e0b, #94a3b8, #3b82f6, #8b5cf6);
+    border-radius: 20px; position: relative; margin: 20px 0;
+  }
+  .spectrum-marker {
+    position: absolute; top: -8px; width: 4px; height: 56px; background: #fff;
+    border-radius: 2px; transform: translateX(-50%);
+  }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <!-- 侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header"><h2>🦉 知舆</h2></div>
+    <div class="sidebar-section">审辩功能</div>
+    <div class="nav-item active" data-page="home"><i class="fa-solid fa-compass"></i> 首页</div>
+    <div class="nav-item" data-page="factcheck"><i class="fa-solid fa-magnifying-glass"></i> 事实核查</div>
+    <div class="nav-item" data-page="fallacy"><i class="fa-solid fa-brain"></i> 逻辑谬误</div>
+    <div class="nav-item" data-page="crossverify"><i class="fa-solid fa-globe"></i> 交叉验证</div>
+    <div class="nav-item" data-page="deepfake"><i class="fa-solid fa-face-smile"></i> 深度伪造</div>
+    <div class="nav-item" data-page="spectrum"><i class="fa-solid fa-chart-simple"></i> 立场光谱</div>
+    <div class="nav-item" data-page="bias"><i class="fa-solid fa-scale-balanced"></i> 观点对冲</div>
+    <div class="sidebar-section">工具</div>
+    <div class="nav-item" data-page="media"><i class="fa-solid fa-shield-halved"></i> 信源评级</div>
+    <div class="nav-item" data-page="video"><i class="fa-solid fa-video"></i> 视频分析</div>
+    <div class="nav-item" data-page="predict"><i class="fa-solid fa-chart-line"></i> 热度预测</div>
+    <div class="nav-item" data-page="chat"><i class="fa-solid fa-comment-dots"></i> 知知对话</div>
+    <div class="sidebar-section">个人</div>
+    <div class="nav-item" data-page="history"><i class="fa-solid fa-clock"></i> 历史记录</div>
+    <div class="nav-item" data-page="settings"><i class="fa-solid fa-gear"></i> 设置</div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main">
+    <header class="main-header">
+      <h1 id="pageTitle">首页</h1>
+      <div class="header-right">
+        <span class="version-badge" id="versionBadge" onclick="switchToEnterprise()" title="切换到企业版" style="cursor:pointer">个人版</span>
+        <span id="headerUser"></span>
+        <button class="btn-secondary" onclick="logout()" style="padding:6px 12px;font-size:12px">退出</button>
+      </div>
+    </header>
+    <div class="main-content" id="mainContent">
+      <!-- 各页面在此动态切换 -->
+    </div>
+  </div>
+</div>
+
+<!-- 认证模态框 -->
+<div class="modal-overlay" id="authModal" style="display:none">
+  <div class="auth-box">
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchATab('login')">登录</div>
+      <div class="auth-tab" onclick="switchATab('register')">注册</div>
+    </div>
+    <form id="loginForm" class="auth-form active" onsubmit="doLogin(event)">
+      <input type="text" id="lId" placeholder="邮箱或手机号" required>
+      <input type="password" id="lPw" placeholder="密码" required>
+      <button type="submit" class="btn-primary">登录</button>
+    </form>
+    <form id="regForm" class="auth-form" onsubmit="doRegister(event)">
+      <input type="text" id="rName" placeholder="用户名" required>
+      <input type="email" id="rEmail" placeholder="邮箱（可选）">
+      <input type="text" id="rPhone" placeholder="手机号（可选）">
+      <input type="password" id="rPw" placeholder="密码" required>
+      <button type="submit" class="btn-primary">注册</button>
+    </form>
+    <button class="btn-secondary" onclick="closeAuth()" style="width:100%;margin-top:12px">取消</button>
+  </div>
+</div>
+
+<style>
+  .auth-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 32px; width: 400px; }
+  .auth-tabs { display: flex; margin-bottom: 20px; }
+  .auth-tab { flex:1; text-align:center; padding:10px; cursor:pointer; border-bottom:2px solid var(--card-border); color:var(--text-dim); }
+  .auth-tab.active { border-bottom-color:var(--accent-cyan); color:var(--accent-cyan); }
+  .auth-form { display:none; flex-direction:column; gap:12px; } .auth-form.active { display:flex; }
+</style>
+
+<script src="/web/shared/js/api-client.js"></script>
+<script src="/web/shared/js/store.js"></script>
+<script src="/web/shared/components/version-switcher.js"></script>
+<script>
+// ==================== 初始化 ====================
+ZhiYuStore.init();
+// Demo模式：无需登录
+document.getElementById('headerUser').textContent = 'Demo用户';
+
+// ==================== 导航 ====================
+const pageTitles = {
+  home:'首页', factcheck:'事实核查', fallacy:'逻辑谬误识别', crossverify:'信源交叉验证',
+  deepfake:'深度伪造检测', spectrum:'立场光谱', bias:'观点对冲', media:'信源评级',
+  video:'视频情绪分析', predict:'热度预测', chat:'知知对话', history:'历史记录', settings:'设置'
+};
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+    navTo(item.dataset.page);
+  });
+});
+
+function navTo(pageId) {
+  document.getElementById('pageTitle').textContent = pageTitles[pageId] || pageId;
+  renderPage(pageId);
+}
+
+let currentChart = null;
+function renderPage(pageId) {
+  const mc = document.getElementById('mainContent');
+  mc.innerHTML = '';
+  const pages = {
+    home: renderHome, factcheck: renderFactCheck, fallacy: renderFallacy,
+    crossverify: renderCrossVerify, deepfake: renderDeepfake, spectrum: renderSpectrum,
+    bias: renderBias, media: renderMedia, video: renderVideo, predict: renderPredict,
+    chat: renderChat, history: renderHistory, settings: renderSettings
+  };
+  if (pages[pageId]) pages[pageId](mc);
+}
+
+// ==================== 首页 ====================
+function renderHome(mc) {
+  mc.innerHTML = `<div class="fade-in">
+    <h2 class="mb-2">👋 欢迎回来，${ZhiYuStore.user?.username || '用户'}</h2>
+    <p class="text-dim mb-3">知舆个人版 —— 你的AI审辩思维助手</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      ${quickCard('fa-magnifying-glass','事实核查','验证任何声明的真实性','factcheck')}
+      ${quickCard('fa-brain','逻辑谬误','识别文本中的常见逻辑错误','fallacy')}
+      ${quickCard('fa-globe','交叉验证','多语言信源对比核实','crossverify')}
+      ${quickCard('fa-face-smile','深度伪造','检测AI生成的虚假内容','deepfake')}
+      ${quickCard('fa-chart-simple','立场光谱','可视化观点分布','spectrum')}
+      ${quickCard('fa-video','视频分析','上传视频进行情绪与风险分析','video')}
+    </div>
+  </div>`;
+}
+function quickCard(icon, title, desc, page) {
+  return `<div class="glass-card" onclick="navTo('${page}')" style="cursor:pointer">
+    <i class="fa-solid ${icon}" style="font-size:28px;color:var(--accent-cyan)"></i>
+    <h3 class="mt-2">${title}</h3><p class="text-dim" style="font-size:13px">${desc}</p>
+  </div>`;
+}
+
+// ==================== 事实核查 ====================
+function renderFactCheck(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">🔍 事实核查</h2><p class="text-dim mb-2">输入任何声明，AI将联网搜索并判断其真实性</p>
+    <div class="glass-card"><textarea id="fcClaim" rows="3" placeholder="输入要核查的声明...例如：'喝牛奶能预防癌症'"></textarea>
+      <button class="btn-primary mt-2" onclick="doFactCheck()">开始核查</button></div>
+    <div id="fcResult"></div></div>`;
+}
+
+async function doFactCheck() {
+  const claim = document.getElementById('fcClaim').value.trim();
+  if (!claim) return alert('请输入要核查的声明');
+  document.getElementById('fcResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 AI正在分析中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/api/critical-thinking/fact-check', {claim});
+    const vColors = {true:'var(--risk-low)',false:'var(--risk-high)',misleading:'var(--risk-medium)',unverified:'var(--text-dim)',half_true:'var(--accent-orange)'};
+    const vLabels = {true:'✅ 真实',false:'❌ 虚假',misleading:'⚠️ 误导性',unverified:'❓ 无法核实',half_true:'🔶 部分真实'};
+    document.getElementById('fcResult').innerHTML = `
+      <div class="verdict-box ${r.verdict} mt-2">
+        <h3 style="color:${vColors[r.verdict]||'var(--text-dim)'}">${vLabels[r.verdict]||r.verdict}</h3>
+        <p>置信度: ${(r.confidence*100).toFixed(0)}%</p>
+        <p class="mt-1">${r.reasoning||''}</p>
+        ${(r.evidence_items||[]).map(e=>`<div class="mt-1"><strong>${e.source}:</strong> ${e.excerpt} <span class="tag">${e.credibility}</span></div>`).join('')}
+      </div>`;
+  } catch(e) { document.getElementById('fcResult').innerHTML = `<p class="text-dim mt-2">核查失败: ${e.message}</p>`; }
+}
+
+// ==================== 逻辑谬误 ====================
+function renderFallacy(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">🧠 逻辑谬误识别</h2><p class="text-dim mb-2">分析文本中存在的逻辑谬误</p>
+    <div class="glass-card"><textarea id="falText" rows="5" placeholder="粘贴要分析的文本..."></textarea>
+      <button class="btn-primary mt-2" onclick="doFallacy()">分析谬误</button></div><div id="falResult"></div></div>`;
+}
+async function doFallacy() {
+  const text = document.getElementById('falText').value.trim();
+  if (!text) return alert('请输入文本');
+  document.getElementById('falResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 分析中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/api/critical-thinking/fallacy/detect', {text});
+    const sevColors = {high:'var(--risk-high)',medium:'var(--risk-medium)',low:'var(--text-dim)'};
+    document.getElementById('falResult').innerHTML = `
+      <div class="glass-card mt-2"><h3>分析结果</h3>
+        ${(r.fallacies_found||[]).length === 0 ? '<p class="text-dim mt-1">未发现明显逻辑谬误</p>' :
+          r.fallacies_found.map(f=>`<div class="mt-2" style="border-left:3px solid ${sevColors[f.severity]||'var(--text-dim)'};padding-left:12px">
+            <strong style="color:${sevColors[f.severity]||'var(--text-dim)'}">${f.name}</strong>
+            <p class="text-dim">${f.description}</p><p class="text-muted" style="font-size:12px">原文: "${f.excerpt}"</p>
+          </div>`).join('')}
+        <p class="mt-2">${r.overall_assessment||''}</p></div>`;
+  } catch(e) { document.getElementById('falResult').innerHTML = `<p class="text-dim mt-2">分析失败: ${e.message}</p>`; }
+}
+
+// ==================== 交叉验证 ====================
+function renderCrossVerify(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">🌐 多语言信源交叉验证</h2><p class="text-dim mb-2">在不同语言信息源中验证同一主张</p>
+    <div class="glass-card"><textarea id="cvClaim" rows="3" placeholder="输入要交叉验证的主张..."></textarea>
+      <div class="mt-2 flex gap-2 items-center"><span class="text-dim">搜索语言:</span>
+        ${['zh','en','ja','ko','fr'].map(l=>`<label><input type="checkbox" class="cvLang" value="${l}" ${l==='zh'||l==='en'?'checked':''}> ${({zh:'中文',en:'英文',ja:'日文',ko:'韩文',fr:'法文'})[l]}</label>`).join('')}
+      </div>
+      <button class="btn-primary mt-2" onclick="doCrossVerify()">开始交叉验证</button></div><div id="cvResult"></div></div>`;
+}
+async function doCrossVerify() {
+  const claim = document.getElementById('cvClaim').value.trim();
+  if (!claim) return alert('请输入主张');
+  const langs = Array.from(document.querySelectorAll('.cvLang:checked')).map(c=>c.value);
+  document.getElementById('cvResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 多语言搜索中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/api/critical-thinking/cross-verify', {claim, languages: langs});
+    const cLabels = {broad_consensus:'✅ 广泛共识',mixed:'🔶 观点不一',mostly_contradicts:'❌ 多数矛盾',no_data:'❓ 无足够数据'};
+    document.getElementById('cvResult').innerHTML = `
+      <div class="glass-card mt-2"><h3>${cLabels[r.consensus_level]||r.consensus_level}</h3>
+        ${Object.entries(r.sources_by_language||{}).map(([lang,srcs])=>`
+          <h4 class="mt-2">${({zh:'中文',en:'英文',ja:'日文',ko:'韩文',fr:'法文'})[lang]||lang}</h4>
+          ${(srcs||[]).map(s=>`<div class="mt-1"><span class="tag">${s.stance||'neutral'}</span> ${s.source}: ${s.snippet}</div>`).join('')}
+        `).join('')}
+        <p class="mt-2">${r.summary||''}</p></div>`;
+  } catch(e) { document.getElementById('cvResult').innerHTML = `<p class="text-dim mt-2">验证失败: ${e.message}</p>`; }
+}
+
+// ==================== 深度伪造 ====================
+function renderDeepfake(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">🎭 深度伪造检测</h2><p class="text-dim mb-2">检测AI生成的虚假图片和视频</p>
+    <div class="glass-card"><p class="text-dim">深度伪造检测功能开发中，当前为Demo占位。</p>
+      <div class="upload-zone mt-2" onclick="alert('Demo占位：深度伪造检测需要GPU推理或调用外部API')">
+        <i class="fa-solid fa-cloud-arrow-up"></i><p>点击或拖拽上传图片/视频</p></div>
+      <button class="btn-primary mt-2" onclick="doDeepfakeDemo()">Demo演示</button></div><div id="dfResult"></div></div>`;
+}
+async function doDeepfakeDemo() {
+  document.getElementById('dfResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 检测中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/api/critical-thinking/deepfake/detect-image');
+    document.getElementById('dfResult').innerHTML = `
+      <div class="glass-card mt-2"><h3>检测结果</h3>
+        <p>深度伪造概率: <strong style="color:var(--risk-low)">${(r.confidence*100).toFixed(1)}%</strong></p>
+        <p class="text-dim">${r.note}</p></div>`;
+  } catch(e) { document.getElementById('dfResult').innerHTML = `<p class="text-dim mt-2">${e.message}</p>`; }
+}
+
+// ==================== 立场光谱 ====================
+function renderSpectrum(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">📊 立场光谱分析</h2><p class="text-dim mb-2">分析某个话题的多方观点立场分布</p>
+    <div class="glass-card"><input type="text" id="spTopic" placeholder="输入话题...例如：'AI是否应该被严格监管'">
+      <button class="btn-primary mt-2" onclick="doSpectrum()">生成光谱</button></div><div id="spResult"></div></div>`;
+}
+async function doSpectrum() {
+  const topic = document.getElementById('spTopic').value.trim();
+  if (!topic) return alert('请输入话题');
+  document.getElementById('spResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 分析中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/api/critical-thinking/spectrum/analyze', {topic});
+    const pColors = ['#ef4444','#f59e0b','#94a3b8','#3b82f6','#8b5cf6'];
+    document.getElementById('spResult').innerHTML = `
+      <div class="glass-card mt-2"><h3>观点立场分布</h3>
+        <div class="spectrum-bar">${(r.positions||[]).map(p=>`<div class="spectrum-marker" style="left:${p.position_score*100}%" title="${p.stance_label}: ${p.excerpt}"></div>`).join('')}</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">${(r.spectrum_visualization?.labels||['左','中左','中','中右','右']).map(l=>`<span>${l}</span>`).join('')}</div>
+        ${(r.positions||[]).map((p,i)=>`<div class="mt-2" style="border-left:3px solid ${pColors[Math.round(p.position_score*4)]||pColors[2]};padding-left:12px"><strong>${p.stance_label}</strong> <span class="text-muted">(${p.source})</span><p class="text-dim">${p.excerpt}</p></div>`).join('')}
+        ${(r.spectrum_visualization?.hotspots||[]).map(h=>`<div class="mt-1"><span class="tag">🔥 ${h.label}</span></div>`).join('')}
+      </div>`;
+  } catch(e) { document.getElementById('spResult').innerHTML = `<p class="text-dim mt-2">${e.message}</p>`; }
+}
+
+// ==================== 其他页面（简化版） ====================
+function renderBias(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">⚖️ 观点对冲分析</h2>
+    <div class="glass-card"><textarea id="biasText" rows="4" placeholder="输入文本或URL进行观点对冲分析..."></textarea>
+      <button class="btn-primary mt-2" onclick="doBias()">分析观点偏向</button></div><div id="biasResult"></div></div>`;
+}
+async function doBias() {
+  const text = document.getElementById('biasText').value.trim();
+  if (!text) return alert('请输入文本或URL');
+  document.getElementById('biasResult').innerHTML = '<p class="pulse text-dim mt-2">分析中...</p>';
+  try {
+    const r = await fetch('/bias/analyze', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content:text})}).then(r=>r.json());
+    document.getElementById('biasResult').innerHTML = `<div class="glass-card mt-2">
+      <h3>${r.core_view||'观点核心'}</h3><p class="mt-1">认同: ${r.support_count||0} | 反对: ${r.oppose_count||0} | 中立: ${r.neutral_count||0}</p></div>`;
+  } catch(e) { document.getElementById('biasResult').innerHTML = `<p class="text-dim mt-2">${e.message}</p>`; }
+}
+
+function renderMedia(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">📰 媒体信源评级</h2>
+    <div class="glass-card"><input type="text" id="mediaUrl" placeholder="输入媒体域名或URL">
+      <button class="btn-primary mt-2" onclick="doMediaCheck()">查询评级</button></div><div id="mediaResult"></div></div>`;
+}
+async function doMediaCheck() {
+  const url = document.getElementById('mediaUrl').value.trim();
+  if (!url) return alert('请输入域名或URL');
+  document.getElementById('mediaResult').innerHTML = '<p class="pulse text-dim mt-2">查询中...</p>';
+  try {
+    const r = await fetch('/media/check', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url_or_name:url,domain:url})}).then(r=>r.json());
+    document.getElementById('mediaResult').innerHTML = `<div class="glass-card mt-2">
+      <h3>${r.name||url}</h3><p>评级: <span class="risk-badge risk-${r.rating==='可信'?'low':r.rating==='存疑'?'medium':'high'}">${r.rating}</span></p>
+      <p class="text-dim mt-1">${r.reason||''}</p></div>`;
+  } catch(e) { document.getElementById('mediaResult').innerHTML = `<p class="text-dim mt-2">${e.message}</p>`; }
+}
+
+function renderVideo(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">📹 视频情绪分析</h2>
+    <div class="glass-card"><div class="upload-zone" onclick="document.getElementById('videoFile').click()">
+      <i class="fa-solid fa-cloud-arrow-up"></i><p>点击上传视频文件</p></div>
+      <input type="file" id="videoFile" accept="video/*" style="display:none" onchange="doVideoUpload()">
+      <button class="btn-primary mt-2" onclick="document.getElementById('videoFile').click()">选择文件并分析</button></div><div id="videoResult"></div></div>`;
+}
+async function doVideoUpload() {
+  const file = document.getElementById('videoFile').files[0];
+  if (!file) return;
+  document.getElementById('videoResult').innerHTML = '<p class="pulse text-dim mt-2">🔄 分析中...（可能需要1-2分钟）</p>';
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await ZhiYuAPI.post('/videos/upload', fd);
+    const emotions = r.emotions || {};
+    document.getElementById('videoResult').innerHTML = `<div class="glass-card mt-2 result-card">
+      <h3>分析结果</h3><p>风险评分: <span class="risk-badge risk-${r.risk_score>50?'high':r.risk_score>30?'medium':'low'}">${r.risk_score}</span></p>
+      <p>类别: <span class="tag">${r.category||'其他'}</span></p>
+      <div class="emotion-grid">${Object.entries(emotions).map(([k,v])=>`<div class="emotion-bar"><div class="label"><span>${k}</span><span>${(v*100).toFixed(0)}%</span></div><div class="bar"><div class="fill" style="width:${(v*100).toFixed(0)}%"></div></div></div>`).join('')}</div>
+      <p class="mt-2"><strong>关键词:</strong> ${(r.keywords||[]).map(k=>`<span class="tag">${k}</span>`).join(' ')}</p>
+      <p class="mt-1 text-dim">${r.suggestions||''}</p></div>`;
+  } catch(e) { document.getElementById('videoResult').innerHTML = `<p class="text-dim mt-2">分析失败: ${e.message}</p>`; }
+}
+
+function renderPredict(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">📈 热度预测</h2>
+    <div class="glass-card"><input type="text" id="predTitle" placeholder="内容标题"><input type="text" id="predTags" class="mt-1" placeholder="标签（逗号分隔）">
+      <input type="text" id="predDesc" class="mt-1" placeholder="简要描述">
+      <button class="btn-primary mt-2" onclick="doPredict()">预测热度</button></div><div id="predResult"></div></div>`;
+}
+async function doPredict() {
+  const title = document.getElementById('predTitle').value.trim();
+  if (!title) return alert('请输入标题');
+  const tags = (document.getElementById('predTags').value||'').split(',').map(t=>t.trim()).filter(Boolean);
+  document.getElementById('predResult').innerHTML = '<p class="pulse text-dim mt-2">预测中...</p>';
+  try {
+    const r = await ZhiYuAPI.post('/predict/ai-predict', {title, tags, category:'其他', description:document.getElementById('predDesc').value, duration:5, author_avg_heat:50});
+    document.getElementById('predResult').innerHTML = `<div class="glass-card mt-2"><h3>预测结果</h3>
+      <p>风险等级: <span class="risk-badge risk-${r.risk_level==='高'?'high':r.risk_level==='中'?'medium':'low'}">${r.risk_level}</span></p>
+      <p class="mt-1">${r.risk||''}</p><p class="text-dim">${r.summary||''}</p></div>`;
+  } catch(e) { document.getElementById('predResult').innerHTML = `<p class="text-dim mt-2">${e.message}</p>`; }
+}
+
+function renderChat(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">💬 知知对话</h2>
+    <div class="glass-card" id="chatMessages" style="height:400px;overflow-y:auto;margin-bottom:16px">
+      <p class="text-dim">🦉 你好！我是知知，你的AI审辩助手。有什么想问的？</p></div>
+    <div class="flex gap-2"><input type="text" id="chatInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')doChat()">
+      <button class="btn-primary" onclick="doChat()">发送</button></div></div>`;
+}
+async function doChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim(); if (!msg) return;
+  const container = document.getElementById('chatMessages');
+  container.innerHTML += `<p class="mt-1"><strong>你:</strong> ${msg}</p>`;
+  input.value = '';
+  try {
+    const r = await ZhiYuAPI.post('/chat/', {message: msg, history:[]});
+    container.innerHTML += `<p class="mt-1" style="color:var(--accent-cyan)"><strong>知知:</strong> ${r.reply}</p>`;
+    container.scrollTop = container.scrollHeight;
+  } catch(e) { container.innerHTML += `<p class="text-dim mt-1">回复失败: ${e.message}</p>`; }
+}
+
+function renderHistory(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">📜 历史记录</h2><div id="historyList"><p class="text-dim">加载中...</p></div></div>`;
+  (async()=>{
+    try {
+      const token = localStorage.getItem('token');
+      const r = await fetch('/history/', {headers:{'Authorization':`Bearer ${token}`}}).then(r=>r.json());
+      document.getElementById('historyList').innerHTML = r.length === 0 ? '<p class="text-dim">暂无分析记录</p>' :
+        r.map(h=>`<div class="glass-card mt-2"><h4>${h.file_name}</h4><p>风险评分: <span class="risk-badge risk-${h.risk_score>50?'high':h.risk_score>30?'medium':'low'}">${h.risk_score}</span></p><p class="text-dim" style="font-size:12px">${h.created_at}</p></div>`).join('');
+    } catch(e) { document.getElementById('historyList').innerHTML = `<p class="text-dim">加载失败: ${e.message}</p>`; }
+  })();
+}
+
+function renderSettings(mc) {
+  mc.innerHTML = `<div class="fade-in"><h2 class="mb-2">⚙️ 设置</h2>
+    <div class="glass-card"><p class="text-dim">用户类型: <strong>${ZhiYuStore.user?.user_type||'personal'}</strong></p>
+      <p class="text-dim">订阅: <strong>${ZhiYuStore.user?.subscription_tier||'free'}</strong></p>
+      ${ZhiYuStore.user?.subscription_expiry ? `<p class="text-dim">到期时间: ${ZhiYuStore.user.subscription_expiry}</p>` : ''}
+      <button class="btn-primary mt-2" onclick="switchToEnterprise()">切换到企业版</button></div></div>`;
+}
+
+// ==================== 版本切换 ====================
+async function switchToEnterprise() {
+  try {
+    await ZhiYuStore.switchVersion('enterprise');
+    window.location.href = '/enterprise';
+  } catch(e) { alert('切换失败: ' + e.message); }
+}
+
+// ==================== 认证 ====================
+function showAuth() { document.getElementById('authModal').style.display = 'flex'; }
+function closeAuth() { document.getElementById('authModal').style.display = 'none'; }
+function switchATab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.auth-form').forEach(f=>f.classList.remove('active'));
+  if (tab==='login') {
+    document.querySelector('.auth-tab:first-child').classList.add('active');
+    document.getElementById('loginForm').classList.add('active');
+  } else {
+    document.querySelector('.auth-tab:last-child').classList.add('active');
+    document.getElementById('regForm').classList.add('active');
+  }
+}
+async function doLogin(e) {
+  e.preventDefault();
+  try {
+    const resp = await fetch('/auth/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({identifier:document.getElementById('lId').value,password:document.getElementById('lPw').value})});
+    if(!resp.ok){const err=await resp.json();throw new Error(err.detail);}
+    const d=await resp.json();
+    const me=await fetch('/auth/me',{headers:{'Authorization':`Bearer ${d.access_token}`}}).then(r=>r.json());
+    ZhiYuStore.setToken(d.access_token,me);
+    closeAuth();
+    document.getElementById('headerUser').textContent = me.username;
+    navTo('home');
+  } catch(e) { alert('登录失败: '+e.message); }
+}
+async function doRegister(e) {
+  e.preventDefault();
+  const body={username:document.getElementById('rName').value,password:document.getElementById('rPw').value};
+  const em=document.getElementById('rEmail').value,ph=document.getElementById('rPhone').value;
+  if(em)body.email=em;if(ph)body.phone=ph;
+  if(!em&&!ph){alert('邮箱和手机号至少填写一项');return;}
+  try {
+    const resp=await fetch('/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!resp.ok){const err=await resp.json();throw new Error(err.detail);}
+    const d=await resp.json();
+    const me=await fetch('/auth/me',{headers:{'Authorization':`Bearer ${d.access_token}`}}).then(r=>r.json());
+    ZhiYuStore.setToken(d.access_token,me);
+    closeAuth();
+    document.getElementById('headerUser').textContent = me.username;
+    navTo('home');
+  } catch(e) { alert('注册失败: '+e.message); }
+}
+function logout() { ZhiYuStore.logout(); window.location.href='/'; }
+
+// 初始化
+navTo('home');
+</script>
+</body>
+</html>

@@ -1,6 +1,5 @@
 # 环境变量 - 包含敏感信息，禁止提交
 .env
-.env；
 
 # Python
 __pycache__/
@@ -14,19 +13,25 @@ venv/
 # 数据库
 *.db
 
-# 上传的文件
+# 上传的文件（运行时生成）
 uploads/
+
+# 运行时处理数据
+data/processed/
 
 # 日志
 logs/
+
+# 大文件模型（2GB+，需单独管理）
+models/
 
 # IDE
 .vscode/
 .idea/
 
-# 大文件模型（2GB+，需单独管理）
-models/
-
 # 系统文件
 desktop.ini
 Thumbs.db
+
+# 不上传的归档资料
+_archive_not_for_upload/

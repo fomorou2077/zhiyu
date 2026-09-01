@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知舆 ZhiYu - AI驱动的舆情智能分析平台</title>
+<link rel="stylesheet" href="/web/shared/css/theme.css">
+<link rel="stylesheet" href="/web/shared/css/components.css">
+<link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  .landing-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero { text-align: center; margin-bottom: 60px; }
+  .hero h1 {
+    font-size: 48px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .hero .subtitle { font-size: 18px; color: var(--text-dim); }
+  .hero .owl-icon { font-size: 64px; margin-bottom: 16px; }
+
+  .cards { display: flex; gap: 32px; width: 100%; flex-wrap: wrap; justify-content: center; }
+  .version-card {
+    flex: 1; min-width: 340px; max-width: 480px;
+    padding: 40px 32px; text-align: center; cursor: pointer;
+  }
+  .version-card h2 { font-size: 28px; margin-bottom: 8px; }
+  .version-card .tagline { color: var(--text-dim); font-size: 15px; margin-bottom: 20px; min-height: 48px; }
+  .version-card .features { text-align: left; margin: 24px 0; }
+  .version-card .features li {
+    padding: 8px 0; color: var(--text-dim); font-size: 14px;
+    list-style: none; display: flex; align-items: center; gap: 10px;
+  }
+  .version-card .features li i { color: var(--accent-cyan); width: 18px; text-align: center; }
+  .version-card.personal { border-top: 3px solid var(--accent-cyan); }
+  .version-card.enterprise { border-top: 3px solid var(--accent-purple); }
+  .version-card.enterprise .features li i { color: var(--accent-purple); }
+
+  .demo-hint {
+    margin-top: 48px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="landing-container">
+  <div class="hero">
+    <div class="owl-icon">🦉</div>
+    <h1>知舆 ZhiYu</h1>
+    <p class="subtitle">AI驱动的舆情智能分析平台 —— 武装你的批判性思维，守护你的品牌声誉</p>
+  </div>
+
+  <div class="cards">
+    <!-- 个人版 -->
+    <div class="version-card glass-card personal" onclick="goTo('personal')">
+      <h2>个人版</h2>
+      <p class="tagline">审辩思维平台 —— 用AI武装你的批判性思维</p>
+      <ul class="features">
+        <li><i class="fa-solid fa-check-circle"></i> 信源可信度评级</li>
+        <li><i class="fa-solid fa-check-circle"></i> AI事实核查</li>
+        <li><i class="fa-solid fa-check-circle"></i> 逻辑谬误识别</li>
+        <li><i class="fa-solid fa-check-circle"></i> 多语言信源交叉验证</li>
+        <li><i class="fa-solid fa-check-circle"></i> 深度伪造检测</li>
+        <li><i class="fa-solid fa-check-circle"></i> 立场光谱可视化</li>
+        <li><i class="fa-solid fa-check-circle"></i> 视频情绪分析</li>
+        <li><i class="fa-solid fa-check-circle"></i> 观点对冲分析</li>
+      </ul>
+      <button class="btn-primary">进入个人版</button>
+    </div>
+
+    <!-- 企业版 -->
+    <div class="version-card glass-card enterprise" onclick="goTo('enterprise')">
+      <h2>企业版</h2>
+      <p class="tagline">品牌舆情监测中台 —— 事前预防、实时监测、事后响应</p>
+      <ul class="features">
+        <li><i class="fa-solid fa-shield-halved"></i> 10维度策划风险预判</li>
+        <li><i class="fa-solid fa-satellite-dish"></i> 多平台实时舆情监测</li>
+        <li><i class="fa-solid fa-bell"></i> 负面情绪自动预警</li>
+        <li><i class="fa-solid fa-diagram-project"></i> 传播路径追踪</li>
+        <li><i class="fa-solid fa-robot"></i> AI自动回应生成</li>
+        <li><i class="fa-solid fa-chart-pie"></i> 可配置监控仪表盘</li>
+        <li><i class="fa-solid fa-file-lines"></i> 多类型报告导出</li>
+        <li><i class="fa-solid fa-clock-rotate-left"></i> 操作审计日志</li>
+      </ul>
+      <button class="btn-primary" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));">进入企业版</button>
+    </div>
+  </div>
+
+  <p class="demo-hint">Demo 版本 · 无需登录 · 点击即可体验全部功能</p>
+</div>
+
+<script src="/web/shared/js/store.js"></script>
+<script>
+  function goTo(version) {
+    localStorage.setItem('current_view', version);
+    ZhiYuStore.init();
+    ZhiYuStore._state.currentView = version;
+    window.location.href = version === 'enterprise' ? '/enterprise' : '/personal';
+  }
+</script>
+</body>
+</html>

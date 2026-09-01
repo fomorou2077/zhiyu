@@ -16,14 +16,14 @@ REM 检查虚拟环境
 if exist ".venv\Scripts\python.exe" (
     echo [1/5] 激活虚拟环境...
     call .venv\Scripts\activate.bat
+    set PYTHON=.venv\Scripts\python.exe
 ) else (
-    echo [错误] 未检测到虚拟环境 .venv
-    pause
-    exit /b 1
+    echo [提示] 未检测到虚拟环境，使用系统 Python
+    set PYTHON=python
 )
 
 echo [2/5] 启动后端服务（后台运行）...
-start "知舆后端" python run.py
+start "知舆后端" %PYTHON% run.py
 
 echo [3/5] 等待后端启动（10秒）...
 timeout /t 10 /nobreak >nul
